@@ -572,6 +572,10 @@ public class StageRegistry {
             }
             return result;
         }
+
+        public Set<String> getAllTeams() {
+            return new HashSet<>(teamStages.keySet());
+        }
     }
 }
 
