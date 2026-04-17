@@ -1,27 +1,26 @@
 package net.unfamily.iskalib.structure;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import com.google.gson.JsonObject;
+import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
- * Integration point for locating external structure definitions on disk.
- *
- * <p>The library does not assume any specific mod id. Consumers can override the base directory and
- * subdirectory name used for structure definitions.
+ * Integration point for structure definitions and client-side saved structures.
  */
 public final class StructureIOHooks {
     private StructureIOHooks() {}
 
+    @FunctionalInterface
+    public interface StructureDefinitionSink {
+        void accept(String definitionId, String filePathForLog, JsonObject json);
+    }
+
     public interface Listener {
         /**
-         * @return base folder where external scripts live (e.g. {@code kubejs/external_scripts}).
+         * Loads server structure JSON from datapacks (path {@code load/iska_utils_structure_definitions/} per namespace)
+         * and/or mod bootstrap. When {@code resourceManager} is null (early game load), implementations should
+         * supply built-in definitions only (e.g. from the mod jar).
          */
-        Path externalScriptsBasePath();
-
-        /**
-         * @return subfolder that contains structure json definitions.
-         */
-        String structuresFolderName();
+        void loadServerStructureDefinitions(ResourceManager resourceManager, StructureDefinitionSink sink);
 
         /**
          * Whether client-side personal structures are accepted.
@@ -37,22 +36,12 @@ public final class StructureIOHooks {
          * If false, client structures cannot enable "place like player".
          */
         boolean allowClientStructurePlaceLikePlayer();
-
-        /**
-         * Optional hook for generating documentation/readme on scan.
-         */
-        void generateDocumentationIfEnabled();
     }
 
     private static volatile Listener listener = new Listener() {
         @Override
-        public Path externalScriptsBasePath() {
-            return Paths.get("kubejs", "external_scripts");
-        }
-
-        @Override
-        public String structuresFolderName() {
-            return "iska_utils_structures";
+        public void loadServerStructureDefinitions(ResourceManager resourceManager, StructureDefinitionSink sink) {
+            // No definitions unless a consumer registers a real listener
         }
 
         @Override
@@ -69,9 +58,6 @@ public final class StructureIOHooks {
         public boolean allowClientStructurePlaceLikePlayer() {
             return false;
         }
-
-        @Override
-        public void generateDocumentationIfEnabled() {}
     };
 
     public static Listener getListener() {
@@ -82,4 +68,3 @@ public final class StructureIOHooks {
         listener = newListener != null ? newListener : listener;
     }
 }
-

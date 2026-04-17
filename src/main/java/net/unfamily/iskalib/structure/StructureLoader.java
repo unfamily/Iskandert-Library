@@ -96,206 +96,43 @@ public class StructureLoader {
      * @param includeClientStructures If true, include client structures in loading
      */
     private static void scanConfigDirectoryInternal(boolean forceClientStructures, net.minecraft.server.level.ServerPlayer player, boolean includeClientStructures) {
-        Path structuresPath = StructureIOHooks.getListener().externalScriptsBasePath()
-                .resolve(StructureIOHooks.getListener().structuresFolderName());
-        
         try {
-            // Create directory if it doesn't exist
-            if (!Files.exists(structuresPath)) {
-                Files.createDirectories(structuresPath);
-            }
-            
             // Save client structures before clear (to preserve them during reload)
             Map<String, StructureDefinition> clientStructureBackup = new HashMap<>();
             Map<String, Boolean> clientProtectedBackup = new HashMap<>();
-            
+
             for (Map.Entry<String, StructureDefinition> entry : STRUCTURES.entrySet()) {
                 if (entry.getKey().startsWith("client_")) {
                     clientStructureBackup.put(entry.getKey(), entry.getValue());
                     clientProtectedBackup.put(entry.getKey(), PROTECTED_DEFINITIONS.get(entry.getKey()));
                 }
             }
-            
+
             // Clear previous structures
             PROTECTED_DEFINITIONS.clear();
             STRUCTURES.clear();
-            
+
             // Restore saved client structures
             STRUCTURES.putAll(clientStructureBackup);
             PROTECTED_DEFINITIONS.putAll(clientProtectedBackup);
-            
-            // Generate default file if it doesn't exist
-            Path defaultStructuresFile = structuresPath.resolve("default_structures.json");
-            if (!Files.exists(defaultStructuresFile) || shouldRegenerateDefaultStructures(defaultStructuresFile)) {
-                generateDefaultStructures(structuresPath);
+
+            net.minecraft.server.packs.resources.ResourceManager resourceManager = null;
+            try {
+                MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+                if (server != null) {
+                    resourceManager = server.getResourceManager();
+                }
+            } catch (Throwable ignored) {
             }
-            
-            // Scan all JSON files in the directory
-            try (Stream<Path> files = Files.walk(structuresPath)) {
-                files.filter(Files::isRegularFile)
-                     .filter(path -> path.toString().endsWith(".json"))
-                     .filter(path -> !path.getFileName().toString().startsWith("."))
-                     .sorted() // Process in alphabetical order
-                     .forEach(StructureLoader::scanConfigFile);
-            }
-            
-            int regularStructuresCount = STRUCTURES.size();
-            
+
+            StructureIOHooks.getListener().loadServerStructureDefinitions(resourceManager, StructureLoader::ingestStructureDefinitionFromJson);
+
             // Scan client structures if enabled and requested
             if (includeClientStructures) {
                 scanClientStructures(forceClientStructures, player);
             }
-            
-            int totalStructuresCount = STRUCTURES.size();
-            
-            // Generate comprehensive documentation (consumer-controlled)
-            StructureIOHooks.getListener().generateDocumentationIfEnabled();
-            
-        } catch (Exception e) {
-        }
-    }
 
-    /**
-     * Checks if the default_structures.json file should be regenerated
-     */
-    private static boolean shouldRegenerateDefaultStructures(Path defaultFile) {
-        try {
-            if (!Files.exists(defaultFile)) return true;
-            
-            // Read the file and check if it has the overwritable field
-            try (InputStream inputStream = Files.newInputStream(defaultFile)) {
-                JsonElement jsonElement = GSON.fromJson(new InputStreamReader(inputStream), JsonElement.class);
-                if (jsonElement != null && jsonElement.isJsonObject()) {
-                    JsonObject json = jsonElement.getAsJsonObject();
-                    if (json.has("overwritable")) {
-                        return json.get("overwritable").getAsBoolean();
-                    }
-                }
-            }
-            return false;
         } catch (Exception e) {
-            return true;
-        }
-    }
-
-    /**
-     * Generates the default structures file
-     */
-    private static void generateDefaultStructures(Path structuresPath) {
-        try {
-            Path defaultStructuresPath = structuresPath.resolve("default_structures.json");
-            
-            // Copy the content of the internal default file
-            String defaultStructuresContent = 
-                "{\n" +
-                "    \"type\": \"iska_utils:structure\",\n" +
-                "    \"overwritable\": true,\n" +
-                "    \"structure\": [\n" +
-                "        {\n" +
-                "            \"id\": \"iska_utils-wither_grinder\",\n" +
-                "            \"name\": \"Iskandert's Wither Grinder\",\n" +
-                "            \"can_force\": true,\n" +
-                "            \"can_replace\": [\n" +
-                "            ],\n" +
-                "            \"icon\": {\n" +
-                "                \"type\": \"minecraft:item\",\n" +
-                "                \"item\": \"minecraft:wither_skeleton_skull\"\n" +
-                "            },\n" +
-                "            \"description\": [\"Easy way to kill withers\"],\n" +
-                "            \"pattern\": [\n" +
-                "                [[\"   \"],[\"   \"],[\"   \"],[\"   \"],[\"AAA\"], [\"AAA\"], [\"AAA\"]],\n" +
-                "                [[\"L@ \"],[\"   \"],[\"   \"],[\"   \"],[\"AAA\"], [\"A A\"], [\"AAA\"]],\n" +
-                "                [[\"   \"],[\"   \"],[\"   \"],[\"   \"],[\"AAA\"], [\"AAA\"], [\"AAA\"]]\n" +
-                "            ],\n" +
-                "            \"key\": {\n" +
-                "                \"A\": {\n" +
-                "                    \"display\": \"iska_utils.wither_proof_block\",\n" +
-                "                    \"alternatives\": [\n" +
-                "                        {\n" +
-                "                            \"block\": \"iska_utils:wither_proof_block\"\n" +
-                "                        },\n" +
-                "                        {\n" +
-                "                            \"block\": \"mob_grinding_utils:tinted_glass\"\n" +
-                "                        }\n" +
-                "                    ]\n" +
-                "                },\n" +
-                "                \"@\": {\n" +
-                "                    \"display\": \"minecraft.sticky_piston\",\n" +
-                "                    \"alternatives\": [\n" +
-                "                        {\n" +
-                "                            \"block\": \"minecraft:sticky_piston\",\n" +
-                "                            \"properties\": {\n" +
-                "                                \"facing\": \"up\"\n" +
-                "                            }\n" +
-                "                        },\n" +
-                "                        {\n" +
-                "                            \"block\": \"minecraft:piston\",\n" +
-                "                            \"properties\": {\n" +
-                "                                \"facing\": \"up\"\n" +
-                "                            }\n" +
-                "                        }\n" +
-                "                    ]\n" +
-                "                },\n" +
-                "                \"L\": {\n" +
-                "                    \"display\": \"minecraft.lever\",\n" +
-                "                    \"alternatives\": [\n" +
-                "                        {\n" +
-                "                            \"block\": \"minecraft:lever\",\n" +
-                "                            \"properties\": {\n" +
-                "                                \"face\": \"floor\",\n" +
-                "                                \"facing\": \"east\",\n" +
-                "                                \"powered\": \"false\"\n" +
-                "                            }\n" +
-                "                        }\n" +
-                "                    ]\n" +
-                "                }\n" +
-                "            }\n" +
-                "        },\n" +
-                "        {\n" +
-                "            \"id\": \"iska_utils-wither_summoning\",\n" +
-                "            \"name\": \"Wither Summoning Structure\",\n" +
-                "            \"can_replace\": [],\n" +
-                "            \"slower\": true,\n" +
-                "            \"place_like_player\": true,\n" +
-                "            \"icon\": {\n" +
-                "                \"type\": \"minecraft:item\",\n" +
-                "                \"item\": \"minecraft:wither_skeleton_skull\"\n" +
-                "            },\n" +
-                "            \"description\": [\"Structure to summon the Wither boss\"],\n" +
-                "            \"pattern\": [\n" +
-                "                [[\" @ \"],[\" A \"],[\"AAA\"],[\"BBB\"]]\n" +
-                "            ],\n" +
-                "            \"key\": {\n" +
-                "                \"A\": {\n" +
-                "                    \"display\": \"minecraft.soul_sand\",\n" +
-                "                    \"alternatives\": [\n" +
-                "                        {\n" +
-                "                            \"block\": \"minecraft:soul_sand\"\n" +
-                "                        },\n" +
-                "                        {\n" +
-                "                            \"block\": \"minecraft:soul_soil\"\n" +
-                "                        }\n" +
-                "                    ]\n" +
-                "                },\n" +
-                "                \"B\": {\n" +
-                "                    \"display\": \"minecraft.wither_skeleton_skull\",\n" +
-                "                    \"alternatives\": [\n" +
-                "                        {\n" +
-                "                            \"block\": \"minecraft:wither_skeleton_skull\",\n" +
-                "                            \"properties\": {\n" +
-                "                                \"rotation\": \"0\"\n" +
-                "                            }\n" +
-                "                        }\n" +
-                "                    ]\n" +
-                "                }\n" +
-                "            }\n" +
-                "        }\n" +
-                "    ]\n" +
-                "}";
-            
-            Files.write(defaultStructuresPath, defaultStructuresContent.getBytes());
-            
-        } catch (IOException e) {
         }
     }
 
@@ -496,18 +333,6 @@ public class StructureLoader {
     }
 
     /**
-     * Scans a single configuration file for structures
-     */
-    private static void scanConfigFile(Path configFile) {
-        String definitionId = configFile.getFileName().toString().replace(".json", "");
-        
-        try (InputStream inputStream = Files.newInputStream(configFile)) {
-            parseConfigFromStream(definitionId, configFile.toString(), inputStream);
-        } catch (Exception e) {
-        }
-    }
-
-    /**
      * Parses configuration from an input stream
      */
     private static void parseConfigFromStream(String definitionId, String filePath, InputStream inputStream) {
@@ -571,6 +396,13 @@ public class StructureLoader {
         } catch (Exception e) {
             return originalJson; // Return the original in case of error
         }
+    }
+
+    /**
+     * Parses one structure definition file (type {@code iska_utils:structure}) from JSON.
+     */
+    public static void ingestStructureDefinitionFromJson(String definitionId, String filePath, JsonObject json) {
+        parseConfigJson(definitionId, filePath, json);
     }
 
     /**
@@ -1241,8 +1073,6 @@ public class StructureLoader {
                 .filter(entry -> entry.getKey().startsWith("client_"))
                 .count();
         
-        // Regenerate documentation (consumer-controlled)
-        StructureIOHooks.getListener().generateDocumentationIfEnabled();
     }
     
     /**

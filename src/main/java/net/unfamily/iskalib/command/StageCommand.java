@@ -33,7 +33,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
- * Command handler for stage management
+ * Stage management commands for the shared library. Root literal is {@code iska_lib_stage} so it does not
+ * collide with game-side {@code iska_utils_*} commands registered by consuming mods.
  */
 public class StageCommand {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -47,34 +48,34 @@ public class StageCommand {
     
     // Initialize usage messages
     static {
-        COMMAND_USAGE.put("list_all", "/iska_utils_stage list all [target player]");
-        COMMAND_USAGE.put("list_player", "/iska_utils_stage list player [target player]");
-        COMMAND_USAGE.put("list_world", "/iska_utils_stage list world");
-        COMMAND_USAGE.put("list_team", "/iska_utils_stage list team <team_name>");
-        COMMAND_USAGE.put("list_team_player", "/iska_utils_stage list team_player [target player]");
+        COMMAND_USAGE.put("list_all", "/iska_lib_stage list all [target player]");
+        COMMAND_USAGE.put("list_player", "/iska_lib_stage list player [target player]");
+        COMMAND_USAGE.put("list_world", "/iska_lib_stage list world");
+        COMMAND_USAGE.put("list_team", "/iska_lib_stage list team <team_name>");
+        COMMAND_USAGE.put("list_team_player", "/iska_lib_stage list team_player [target player]");
         
-        COMMAND_USAGE.put("set_player", "/iska_utils_stage set player [target player] <stage> [value=true] [silent=false]");
-        COMMAND_USAGE.put("set_world", "/iska_utils_stage set world <stage> [value=true] [silent=false]");
-        COMMAND_USAGE.put("set_team", "/iska_utils_stage set team <team_name> <stage> [value=true] [silent=false]");
-        COMMAND_USAGE.put("set_team_player", "/iska_utils_stage set team_player [target player] <stage> [value=true] [silent=false]");
+        COMMAND_USAGE.put("set_player", "/iska_lib_stage set player [target player] <stage> [value=true] [silent=false]");
+        COMMAND_USAGE.put("set_world", "/iska_lib_stage set world <stage> [value=true] [silent=false]");
+        COMMAND_USAGE.put("set_team", "/iska_lib_stage set team <team_name> <stage> [value=true] [silent=false]");
+        COMMAND_USAGE.put("set_team_player", "/iska_lib_stage set team_player [target player] <stage> [value=true] [silent=false]");
         
-        COMMAND_USAGE.put("add_player", "/iska_utils_stage add player [target player] <stage> [silent=false] [hide=false]");
-        COMMAND_USAGE.put("add_world", "/iska_utils_stage add world <stage> [silent=false] [hide=false]");
-        COMMAND_USAGE.put("add_team", "/iska_utils_stage add team <team_name> <stage> [silent=false] [hide=false]");
-        COMMAND_USAGE.put("add_team_player", "/iska_utils_stage add team_player [target player] <stage> [silent=false] [hide=false]");
+        COMMAND_USAGE.put("add_player", "/iska_lib_stage add player [target player] <stage> [silent=false] [hide=false]");
+        COMMAND_USAGE.put("add_world", "/iska_lib_stage add world <stage> [silent=false] [hide=false]");
+        COMMAND_USAGE.put("add_team", "/iska_lib_stage add team <team_name> <stage> [silent=false] [hide=false]");
+        COMMAND_USAGE.put("add_team_player", "/iska_lib_stage add team_player [target player] <stage> [silent=false] [hide=false]");
         
-        COMMAND_USAGE.put("remove_player", "/iska_utils_stage remove player [target player] <stage> [silent=false] [hide=false]");
-        COMMAND_USAGE.put("remove_world", "/iska_utils_stage remove world <stage> [silent=false] [hide=false]");
-        COMMAND_USAGE.put("remove_team", "/iska_utils_stage remove team <team_name> <stage> [silent=false] [hide=false]");
-        COMMAND_USAGE.put("remove_team_player", "/iska_utils_stage remove team_player [target player] <stage> [silent=false] [hide=false]");
+        COMMAND_USAGE.put("remove_player", "/iska_lib_stage remove player [target player] <stage> [silent=false] [hide=false]");
+        COMMAND_USAGE.put("remove_world", "/iska_lib_stage remove world <stage> [silent=false] [hide=false]");
+        COMMAND_USAGE.put("remove_team", "/iska_lib_stage remove team <team_name> <stage> [silent=false] [hide=false]");
+        COMMAND_USAGE.put("remove_team_player", "/iska_lib_stage remove team_player [target player] <stage> [silent=false] [hide=false]");
         
-        COMMAND_USAGE.put("clear_player", "/iska_utils_stage clear player [target player] [silent=false] [hide=false]");
-        COMMAND_USAGE.put("clear_world", "/iska_utils_stage clear world [silent=false] [hide=false]");
-        COMMAND_USAGE.put("clear_team", "/iska_utils_stage clear team <team_name> [silent=false] [hide=false]");
-        COMMAND_USAGE.put("clear_team_player", "/iska_utils_stage clear team_player [target player] [silent=false] [hide=false]");
-        COMMAND_USAGE.put("clear_all", "/iska_utils_stage clear all [target player] [silent=false] [hide=false]");
+        COMMAND_USAGE.put("clear_player", "/iska_lib_stage clear player [target player] [silent=false] [hide=false]");
+        COMMAND_USAGE.put("clear_world", "/iska_lib_stage clear world [silent=false] [hide=false]");
+        COMMAND_USAGE.put("clear_team", "/iska_lib_stage clear team <team_name> [silent=false] [hide=false]");
+        COMMAND_USAGE.put("clear_team_player", "/iska_lib_stage clear team_player [target player] [silent=false] [hide=false]");
+        COMMAND_USAGE.put("clear_all", "/iska_lib_stage clear all [target player] [silent=false] [hide=false]");
 
-        COMMAND_USAGE.put("call_action", "/iska_utils_stage call_action <target> <action_id> [force=false] [silent=false] [hide=false]");
+        COMMAND_USAGE.put("call_action", "/iska_lib_stage call_action <target> <action_id> [force=false] [silent=false] [hide=false]");
     }
     
     /**
@@ -234,7 +235,7 @@ public class StageCommand {
                         .then(Commands.argument("hide", BoolArgumentType.bool())
                             .executes(ctx -> setTeamPlayerStageForSelf(ctx, false, null, ctx.getArgument("hide", Boolean.class)))))));
 
-        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("iska_utils_stage")
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("iska_lib_stage")
                 .requires(source -> source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(2))))
                 // ADD and REMOVE first so they appear in suggestions (add, clear, list, remove, set)
                 .then(addNode)
@@ -326,7 +327,7 @@ public class StageCommand {
      * Displays command usage to a player
      */
     public static void sendUsage(CommandSourceStack source, String commandKey) {
-        String usage = COMMAND_USAGE.getOrDefault(commandKey, "/iska_utils_stage " + commandKey.replace('_', ' '));
+        String usage = COMMAND_USAGE.getOrDefault(commandKey, "/iska_lib_stage " + commandKey.replace('_', ' '));
         source.sendFailure(Component.literal("§cUsage: " + usage));
     }
     
@@ -334,7 +335,7 @@ public class StageCommand {
      * Gets the command usage string for JSON definitions
      */
     public static String getCommandUsage(String commandKey) {
-        return COMMAND_USAGE.getOrDefault(commandKey, "/iska_utils_stage " + commandKey.replace('_', ' '));
+        return COMMAND_USAGE.getOrDefault(commandKey, "/iska_lib_stage " + commandKey.replace('_', ' '));
     }
     
     /**
