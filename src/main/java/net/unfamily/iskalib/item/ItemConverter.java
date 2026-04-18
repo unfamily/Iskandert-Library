@@ -5,6 +5,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
 import net.minecraft.commands.arguments.item.ItemParser;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
@@ -17,7 +18,7 @@ import org.slf4j.Logger;
  * Parses item strings (with optional data components) into ItemStacks.
  *
  * <p>Supports both simple format {@code minecraft:diamond_sword} and component format
- * {@code minecraft:diamond_sword[damage=500,enchantments={sharpness:3}]}
+ * {@code minecraft:diamond_sword[minecraft:damage=500,...]} (same shape as the {@code /give} item argument).
  */
 public final class ItemConverter {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -73,6 +74,27 @@ public final class ItemConverter {
     public static String getItemDisplayName(String itemString) {
         ItemStack stack = parseItemString(itemString, 1);
         return !stack.isEmpty() ? stack.getHoverName().getString() : itemString;
+    }
+
+    /**
+     * Item id plus optional data-component bracket, as accepted by {@code /give} and {@link #parseItemString(String, int)}
+     * (e.g. shop {@code item} fields). Example: {@code minecraft:stone[minecraft:max_damage=233]}.
+     */
+    public static String formatAsItemArgument(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return "";
+        }
+        Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        DataComponentPatch patch = stack.getComponentsPatch();
+        if (patch.isEmpty()) {
+            return id.toString();
+        }
+        String patchStr = patch.toString();
+        if (patchStr.startsWith("{") && patchStr.endsWith("}")) {
+            patchStr = patchStr.substring(1, patchStr.length() - 1);
+        }
+        patchStr = patchStr.replace("=>", "=");
+        return id + "[" + patchStr + "]";
     }
 
     private static ItemStack fallbackParsing(String itemString, int count) {

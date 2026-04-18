@@ -75,7 +75,7 @@ public class StructurePlacementHistory {
     public static boolean undoLastPlacement(ServerPlayer player) {
         LinkedList<StructurePlacementEntry> history = PLAYER_HISTORY.get(player.getUUID());
         if (history == null || history.isEmpty()) {
-            player.sendSystemMessage(Component.translatable("message.iska_utils.structure_undo.no_history"));
+            player.sendOverlayMessage(Component.translatable("message.iska_utils.structure_undo.no_history"));
             return false;
         }
 
@@ -105,7 +105,7 @@ public class StructurePlacementHistory {
         // Get the structure definition
         StructureDefinition structure = StructureLoader.getStructure(entry.getStructureId());
         if (structure == null) {
-            player.sendSystemMessage(Component.translatable("message.iska_utils.structure_undo.structure_not_found", entry.getStructureId()));
+            player.sendOverlayMessage(Component.translatable("message.iska_utils.structure_undo.structure_not_found", entry.getStructureId()));
             return false;
         }
 
@@ -115,7 +115,7 @@ public class StructurePlacementHistory {
         );
 
         if (expectedPositions.isEmpty()) {
-            player.sendSystemMessage(Component.translatable("message.iska_utils.structure_undo.no_positions"));
+            player.sendOverlayMessage(Component.translatable("message.iska_utils.structure_undo.no_positions"));
             return false;
         }
 
@@ -167,11 +167,11 @@ public class StructurePlacementHistory {
         // Feedback to player
         String structureName = structure.getName() != null ? structure.getName() : structure.getId();
         if (removedBlocks > 0) {
-            player.sendSystemMessage(Component.translatable("message.iska_utils.structure_undo.success",
+            player.sendOverlayMessage(Component.translatable("message.iska_utils.structure_undo.success",
                 structureName, removedBlocks, skippedBlocks));
             return true;
         } else {
-            player.sendSystemMessage(Component.translatable("message.iska_utils.structure_undo.no_blocks",
+            player.sendOverlayMessage(Component.translatable("message.iska_utils.structure_undo.no_blocks",
                 structureName));
             return false;
         }

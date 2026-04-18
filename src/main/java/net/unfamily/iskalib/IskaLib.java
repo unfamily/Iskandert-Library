@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
+import net.unfamily.iskalib.client.marker.VanillaWorldMarkerClientHooks;
 import net.unfamily.iskalib.explosion.ExplosionSystem;
 
 @Mod(IskaLib.MOD_ID)
@@ -19,6 +20,18 @@ public class IskaLib {
     public IskaLib(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.COMMON, IskaLibConfig.SPEC);
         NeoForge.EVENT_BUS.register(ExplosionSystem.class);
+        if (isPhysicalClient()) {
+            VanillaWorldMarkerClientHooks.registerIfNeeded(NeoForge.EVENT_BUS);
+        }
+    }
+
+    private static boolean isPhysicalClient() {
+        try {
+            Class.forName("net.minecraft.client.Minecraft");
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 }
 

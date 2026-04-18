@@ -6,7 +6,8 @@ import net.minecraft.server.level.ServerLevel;
 import java.util.UUID;
 
 /**
- * Server-side cleanup utilities for temporary scanner markers.
+ * Server-side cleanup for legacy temporary scanner markers spawned as {@code block_display}
+ * entities (e.g. tag {@code temp_scan}). Wiring is registered in {@link LegacyBlockDisplayMarkerEvents}.
  */
 public final class ScannerMarkerCleanup {
     private ScannerMarkerCleanup() {}
