@@ -35,6 +35,14 @@ public final class HandItemDump {
 
     private HandItemDump() {}
 
+    /** Chat / copy payload: no line breaks (NBT SNBT and JSON pretty dumps otherwise span multiple lines). */
+    private static String toChatSingleLine(String s) {
+        if (s == null || s.isEmpty()) {
+            return "";
+        }
+        return s.replace("\r\n", "").replace("\n", "").replace("\r", "");
+    }
+
     /**
      * Dumps main hand and off hand for a player. Always returns {@code 1} when the player exists.
      */
@@ -69,7 +77,7 @@ public final class HandItemDump {
     private static void appendStackJsonLine(CommandSourceStack source, ServerPlayer player, ItemStack stack) {
         var ops = player.registryAccess().createSerializationContext(JsonOps.INSTANCE);
         JsonElement encoded = ItemStack.CODEC.encodeStart(ops, stack).getOrThrow();
-        String json = GSON.toJson(encoded);
+        String json = toChatSingleLine(GSON.toJson(encoded));
         source.sendSuccess(() -> copyableLine("Stack JSON", json, ChatFormatting.YELLOW), false);
     }
 
@@ -136,7 +144,7 @@ public final class HandItemDump {
             sendCopyableNbt(source, nbtTag.toString(), ChatFormatting.YELLOW);
         }
 
-        LOGGER.info("[HandItemDump] Item ID: {}\n{}", itemIdStr, nbtTag);
+        LOGGER.info("[HandItemDump] Item ID: {} | {}", itemIdStr, toChatSingleLine(nbtTag.toString()));
     }
 
     private static MutableComponent copyableLine(String label, String text, ChatFormatting color) {
@@ -155,6 +163,7 @@ public final class HandItemDump {
     }
 
     private static void sendCopyableNbt(CommandSourceStack source, String nbtString, ChatFormatting color) {
+        nbtString = toChatSingleLine(nbtString);
         Component copyFeedback = Component.literal("Click to copy");
         if (nbtString.length() > MAX_CHAT_LENGTH) {
             int chunks = (nbtString.length() + MAX_CHAT_LENGTH - 1) / MAX_CHAT_LENGTH;
