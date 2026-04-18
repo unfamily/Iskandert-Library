@@ -26,7 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Server-side dump of held items: full {@code /give} line, same item id+bracket as shop/parseItemString, JSON, then tags / NBT detail.
+ * Server-side dump of held items: item id + component bracket (same as shop / {@code /give} item argument), JSON, then tags / NBT detail.
  */
 public final class HandItemDump {
     private static final Logger LOGGER = LoggerFactory.getLogger(HandItemDump.class);
@@ -56,16 +56,13 @@ public final class HandItemDump {
             return;
         }
 
-        appendGiveAndItemLines(source, stack);
+        appendItemArgumentLine(source, stack);
         appendStackJsonLine(source, player, stack);
         appendDetailedDump(source, player, stack);
     }
 
-    private static void appendGiveAndItemLines(CommandSourceStack source, ItemStack stack) {
+    private static void appendItemArgumentLine(CommandSourceStack source, ItemStack stack) {
         String itemArg = ItemConverter.formatAsItemArgument(stack);
-        int count = stack.getCount();
-        String giveLine = "give @p " + itemArg + " " + count;
-        source.sendSuccess(() -> copyableLine("Give", giveLine, ChatFormatting.GREEN), false);
         source.sendSuccess(() -> copyableLine("Item", itemArg, ChatFormatting.AQUA), false);
     }
 
@@ -125,8 +122,14 @@ public final class HandItemDump {
                 .toList();
         if (!itemTags.isEmpty()) {
             source.sendSuccess(() -> Component.literal("Tags:").withStyle(ChatFormatting.WHITE), false);
-            String tagsString = String.join(", ", itemTags.stream().map(tag -> "#" + tag).toList());
-            sendCopyableNbt(source, tagsString, ChatFormatting.YELLOW);
+            for (String tag : itemTags) {
+                String tagWithHash = "#" + tag;
+                source.sendSuccess(
+                        () -> Component.literal("  ")
+                                .withStyle(ChatFormatting.DARK_GRAY)
+                                .append(clickableCopyOnly(tagWithHash, ChatFormatting.YELLOW)),
+                        false);
+            }
         }
 
         if (blocksTag.isEmpty() && itemsTag.isEmpty() && !nbtTag.isEmpty()) {
@@ -138,12 +141,17 @@ public final class HandItemDump {
 
     private static MutableComponent copyableLine(String label, String text, ChatFormatting color) {
         MutableComponent prefix = Component.literal(label + ": ").withStyle(ChatFormatting.WHITE);
-        MutableComponent body = Component.literal(text)
+        MutableComponent body = clickableCopyOnly(text, color);
+        return prefix.append(body);
+    }
+
+    /** One click copies exactly {@code text} (e.g. a single {@code #namespace:path} tag). */
+    private static MutableComponent clickableCopyOnly(String text, ChatFormatting color) {
+        return Component.literal(text)
                 .withStyle(Style.EMPTY
                         .withColor(color)
                         .withClickEvent(new ClickEvent.CopyToClipboard(text))
                         .withHoverEvent(new HoverEvent.ShowText(Component.literal("Click to copy"))));
-        return prefix.append(body);
     }
 
     private static void sendCopyableNbt(CommandSourceStack source, String nbtString, ChatFormatting color) {

@@ -145,6 +145,11 @@ public class StageRegistry {
             return false;
         }
 
+        boolean already = data.hasStage(stage);
+        if (value == already) {
+            return true;
+        }
+
         if (value) {
             data.addStage(stage);
         } else {
@@ -319,6 +324,13 @@ public class StageRegistry {
     }
 
     public static boolean addPlayerStage(Entity player, String stage) {
+        return addPlayerStage(player, stage, false);
+    }
+
+    /**
+     * @param hideLog when true, skips INFO log line for this change (hooks still run).
+     */
+    public static boolean addPlayerStage(Entity player, String stage, boolean hideLog) {
         if (!(player instanceof ServerPlayer serverPlayer) || player.level().isClientSide()) {
             return false;
         }
@@ -328,10 +340,17 @@ public class StageRegistry {
             return false;
         }
 
-        return getInstance(server).setPlayerStage(serverPlayer, stage, true);
+        return getInstance(server).setPlayerStage(serverPlayer, stage, true, hideLog);
     }
 
     public static boolean removePlayerStage(Entity player, String stage) {
+        return removePlayerStage(player, stage, false);
+    }
+
+    /**
+     * @param hideLog when true, skips INFO log line for this change (hooks still run).
+     */
+    public static boolean removePlayerStage(Entity player, String stage, boolean hideLog) {
         if (!(player instanceof ServerPlayer serverPlayer) || player.level().isClientSide()) {
             return false;
         }
@@ -341,7 +360,7 @@ public class StageRegistry {
             return false;
         }
 
-        return getInstance(server).setPlayerStage(serverPlayer, stage, false);
+        return getInstance(server).setPlayerStage(serverPlayer, stage, false, hideLog);
     }
 
     public static boolean addWorldStage(LevelAccessor level, String stage) {
@@ -443,7 +462,7 @@ public class StageRegistry {
         public void removeStage(String stage) {
             ListTag stageList = getStageList();
             for (int i = 0; i < stageList.size(); i++) {
-                if (stageList.getString(i).equals(stage)) {
+                if (stageList.getString(i).orElse("").equals(stage)) {
                     stageList.remove(i);
                     break;
                 }
