@@ -1,7 +1,6 @@
 package net.unfamily.iskalib.team;
 
 import com.mojang.logging.LogUtils;
-import com.mojang.serialization.Codec;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -78,6 +77,51 @@ public class ShopTeamManager {
     public String getPlayerTeam(ServerPlayer player) {
         TeamData data = getTeamData();
         return data.getPlayerTeam(player.getUUID());
+    }
+
+    /**
+     * Internal team key for the player (may be a UUID string when synced to external systems).
+     * Legacy behavior: this can be a human-readable name.
+     */
+    public String getPlayerTeamKey(ServerPlayer player) {
+        return getPlayerTeam(player);
+    }
+
+    /**
+     * Display name for a team key. Legacy teams may use the key as the display name.
+     */
+    public String getTeamDisplayName(String teamKey) {
+        TeamData data = getTeamData();
+        return data.getTeamDisplayName(teamKey);
+    }
+
+    /**
+     * Resolve a user-visible name to an internal team key.
+     * Returns the input if it already matches a known key.
+     */
+    public String resolveTeamKeyByDisplayName(String input) {
+        TeamData data = getTeamData();
+        return data.resolveTeamKeyByDisplayName(input);
+    }
+
+    /**
+     * Ensure a shop team exists for an external team system.
+     *
+     * <p>Does not move balances between teams; if a legacy team exists under {@code ownerId.toString()},
+     * it is moved to {@code teamKey} to preserve balances.
+     */
+    public void ensureShopTeamForFtb(String teamKey, String displayName, UUID ownerId) {
+        TeamData data = getTeamData();
+        data.ensureTeamForExternalKey(teamKey, displayName, ownerId);
+    }
+
+    /**
+     * Apply a full external snapshot (leader/name/members/assistants + player-to-team mapping).
+     * Balances are untouched.
+     */
+    public void applyExternalTeamSnapshot(String teamKey, String displayName, UUID ownerId, Set<UUID> members, Set<UUID> assistants) {
+        TeamData data = getTeamData();
+        data.applyExternalSnapshot(teamKey, displayName, ownerId, members, assistants);
     }
 
     public List<UUID> getTeamMembers(String teamName) {
@@ -210,7 +254,7 @@ public class ShopTeamManager {
     }
 
     public List<String> getAllTeamNames() {
-        return new ArrayList<>(getAllTeams());
+        return getTeamData().getAllTeamDisplayNames();
     }
 
     public static class TeamData extends SavedData {
@@ -256,6 +300,145 @@ public class ShopTeamManager {
             }
 
             return data;
+        }
+
+        public String getTeamDisplayName(String teamKey) {
+            if (teamKey == null) {
+                return null;
+            }
+            Team t = teams.get(teamKey);
+            return t != null ? t.getName() : null;
+        }
+
+        public List<String> getAllTeamDisplayNames() {
+            List<String> out = new ArrayList<>();
+            for (Team t : teams.values()) {
+                out.add(t.getName());
+            }
+            return out;
+        }
+
+        public String resolveTeamKeyByDisplayName(String input) {
+            if (input == null) {
+                return null;
+            }
+            if (teams.containsKey(input)) {
+                return input;
+            }
+            for (Map.Entry<String, Team> e : teams.entrySet()) {
+                if (e.getValue() != null && e.getValue().getName() != null && e.getValue().getName().equalsIgnoreCase(input)) {
+                    return e.getKey();
+                }
+            }
+            return input;
+        }
+
+        public void ensureTeamForExternalKey(String teamKey, String displayName, UUID ownerId) {
+            if (teamKey == null || teamKey.isBlank()) {
+                return;
+            }
+
+            // Migration: if a legacy team exists under owner UUID string, move it to external key.
+            if (ownerId != null) {
+                String legacyKey = ownerId.toString();
+                if (!legacyKey.equals(teamKey) && teams.containsKey(legacyKey) && !teams.containsKey(teamKey)) {
+                    Team legacy = teams.remove(legacyKey);
+                    teams.put(teamKey, legacy);
+                    // keep name as displayName when provided
+                    if (legacy != null && displayName != null && !displayName.isBlank()) {
+                        legacy.setName(displayName);
+                    }
+
+                    // Update playerTeams mapping for all members of that team to new key
+                    if (legacy != null) {
+                        for (UUID member : legacy.getMembers()) {
+                            playerTeams.put(member, teamKey);
+                        }
+                    }
+                    setDirty();
+                    return;
+                }
+            }
+
+            Team existing = teams.get(teamKey);
+            if (existing == null) {
+                UUID leader = ownerId != null ? ownerId : UUID.randomUUID();
+                Team t = new Team(displayName != null && !displayName.isBlank() ? displayName : teamKey, leader);
+                teams.put(teamKey, t);
+                teamsById.put(t.getTeamId(), t);
+                setDirty();
+            } else if (displayName != null && !displayName.isBlank() && !displayName.equals(existing.getName())) {
+                existing.setName(displayName);
+                setDirty();
+            }
+        }
+
+        public void applyExternalSnapshot(String teamKey, String displayName, UUID ownerId, Set<UUID> members, Set<UUID> assistants) {
+            ensureTeamForExternalKey(teamKey, displayName, ownerId);
+            Team team = teams.get(teamKey);
+            if (team == null) {
+                return;
+            }
+
+            boolean changed = false;
+
+            if (displayName != null && !displayName.isBlank() && !displayName.equals(team.getName())) {
+                team.setName(displayName);
+                changed = true;
+            }
+
+            if (ownerId != null && !ownerId.equals(team.getLeader())) {
+                team.setLeader(ownerId);
+                changed = true;
+            }
+
+            // Rebuild membership sets (keep balances)
+            Set<UUID> newMembers = members != null ? new HashSet<>(members) : new HashSet<>();
+            if (ownerId != null) newMembers.add(ownerId);
+
+            Set<UUID> newAssistants = assistants != null ? new HashSet<>(assistants) : new HashSet<>();
+            newAssistants.retainAll(newMembers);
+
+            // Clear existing sets by removing all and re-adding
+            for (UUID old : new HashSet<>(team.getMembers())) {
+                if (!newMembers.contains(old)) {
+                    team.removeMember(old);
+                    changed = true;
+                }
+            }
+            for (UUID m : newMembers) {
+                if (!team.getMembers().contains(m)) {
+                    team.addMember(m);
+                    changed = true;
+                }
+            }
+
+            // Assistants: clear then set
+            for (UUID old : new HashSet<>(team.getAssistants())) {
+                if (!newAssistants.contains(old)) {
+                    team.removeAssistant(old);
+                    changed = true;
+                }
+            }
+            for (UUID a : newAssistants) {
+                if (!team.getAssistants().contains(a)) {
+                    team.addAssistant(a);
+                    changed = true;
+                }
+            }
+
+            // Update player -> team mapping for known members
+            for (UUID m : newMembers) {
+                String prev = playerTeams.get(m);
+                if (!teamKey.equals(prev)) {
+                    playerTeams.put(m, teamKey);
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                setDirty();
+            }
         }
 
         static CompoundTag toTag(TeamData data) {
