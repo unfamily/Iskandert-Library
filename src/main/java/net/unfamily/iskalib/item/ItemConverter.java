@@ -3,16 +3,27 @@ package net.unfamily.iskalib.item;
 import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
+import com.mojang.serialization.DataResult;
 import net.minecraft.commands.arguments.item.ItemParser;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.slf4j.Logger;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Parses item strings (with optional data components) into ItemStacks.
@@ -77,13 +88,158 @@ public final class ItemConverter {
     }
 
     /**
-     * Item id plus optional data-component bracket, as accepted by {@code /give} and {@link #parseItemString(String, int)}
-     * (e.g. shop {@code item} fields). Example: {@code minecraft:stone[minecraft:max_damage=233]}.
+     * KubeJS-like item string without quotes or count prefix.
+     *
+     * <p>Example: {@code minecraft:diamond_sword[damage=5,custom_data={...}]}
+     * where component keys in the {@code minecraft} namespace are reduced to just the path (e.g. {@code damage}).
+     */
+    public static String formatAsKubeJsItemString(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return "";
+        }
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server != null) {
+            try {
+                return formatAsKubeJsItemString(stack, server.registryAccess());
+            } catch (RuntimeException e) {
+                LOGGER.warn("KubeJS item string encoding failed, falling back to /give shape: {}", e.getMessage());
+            }
+        }
+        return formatAsItemArgumentLegacy(stack);
+    }
+
+    /**
+     * Same as {@link #formatAsKubeJsItemString(ItemStack)} with an explicit registry context.
+     */
+    public static String formatAsKubeJsItemString(ItemStack stack, HolderLookup.Provider registries) {
+        if (stack.isEmpty()) {
+            return "";
+        }
+        Identifier itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        DataComponentPatch patch = stack.getComponentsPatch();
+        if (patch.isEmpty()) {
+            return itemId.toString();
+        }
+
+        RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
+        List<Map.Entry<DataComponentType<?>, Optional<?>>> entries = new ArrayList<>(patch.entrySet());
+        entries.sort(Comparator.comparing(e -> {
+            Identifier id = BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(e.getKey());
+            return id != null ? id.toString() : "";
+        }));
+
+        StringBuilder bracket = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<DataComponentType<?>, Optional<?>> entry : entries) {
+            DataComponentType<?> type = entry.getKey();
+            Optional<?> opt = entry.getValue();
+            Identifier compId = BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(type);
+            if (compId == null) {
+                continue;
+            }
+
+            if (!first) {
+                bracket.append(',');
+            }
+            first = false;
+
+            String compKey = "minecraft".equals(compId.getNamespace()) ? compId.getPath() : compId.toString();
+            if (opt.isEmpty()) {
+                bracket.append('!').append(compKey);
+            } else {
+                @SuppressWarnings("unchecked")
+                DataComponentType<Object> typed = (DataComponentType<Object>) type;
+                Object value = opt.get();
+                DataResult<Tag> encoded = typed.codecOrThrow().encodeStart(ops, value);
+                Tag tag = encoded.getOrThrow();
+                bracket.append(compKey).append('=').append(tag);
+            }
+        }
+
+        return itemId + "[" + bracket + "]";
+    }
+
+    /**
+     * JSON compatible representation of {@link #formatAsKubeJsItemString(ItemStack)}.
+     *
+     * <p>It wraps the string in double quotes and performs exactly two replacements:
+     * {@code \} → {@code \\} and {@code "} → {@code \"}.
+     */
+    public static String formatAsKubeJsItemStringJson(ItemStack stack) {
+        String raw = formatAsKubeJsItemString(stack);
+        if (raw.isEmpty()) {
+            return "\"\"";
+        }
+        raw = raw.replace("\\", "\\\\").replace("\"", "\\\"");
+        return "\"" + raw + "\"";
+    }
+
+    /**
+     * Item id plus data-component bracket in the same SNBT shape as {@link ItemParser} / {@code /give}.
+     * Encodes each component with its registry codec to NBT so nested quotes (e.g. {@code item_name}) use SNBT escaping.
      */
     public static String formatAsItemArgument(ItemStack stack) {
         if (stack.isEmpty()) {
             return "";
         }
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server != null) {
+            try {
+                return formatAsItemArgument(stack, server.registryAccess());
+            } catch (RuntimeException e) {
+                LOGGER.warn("SNBT item argument encoding failed, using legacy patch string: {}", e.getMessage());
+            }
+        }
+        return formatAsItemArgumentLegacy(stack);
+    }
+
+    /**
+     * Same as {@link #formatAsItemArgument(ItemStack)} with an explicit registry context (e.g. player on server).
+     */
+    public static String formatAsItemArgument(ItemStack stack, HolderLookup.Provider registries) {
+        if (stack.isEmpty()) {
+            return "";
+        }
+        Identifier itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        DataComponentPatch patch = stack.getComponentsPatch();
+        if (patch.isEmpty()) {
+            return itemId.toString();
+        }
+        RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
+        List<Map.Entry<DataComponentType<?>, Optional<?>>> entries = new ArrayList<>(patch.entrySet());
+        entries.sort(Comparator.comparing(e -> {
+            Identifier id = BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(e.getKey());
+            return id != null ? id.toString() : "";
+        }));
+
+        StringBuilder bracket = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<DataComponentType<?>, Optional<?>> entry : entries) {
+            DataComponentType<?> type = entry.getKey();
+            Optional<?> opt = entry.getValue();
+            Identifier compId = BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(type);
+            if (compId == null) {
+                continue;
+            }
+            if (!first) {
+                bracket.append(',');
+            }
+            first = false;
+            if (opt.isEmpty()) {
+                bracket.append('!').append(compId);
+            } else {
+                @SuppressWarnings("unchecked")
+                DataComponentType<Object> typed = (DataComponentType<Object>) type;
+                Object value = opt.get();
+                DataResult<Tag> encoded = typed.codecOrThrow().encodeStart(ops, value);
+                Tag tag = encoded.getOrThrow();
+                bracket.append(compId).append('=').append(tag);
+            }
+        }
+        return itemId + "[" + bracket + "]";
+    }
+
+    private static String formatAsItemArgumentLegacy(ItemStack stack) {
         Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         DataComponentPatch patch = stack.getComponentsPatch();
         if (patch.isEmpty()) {

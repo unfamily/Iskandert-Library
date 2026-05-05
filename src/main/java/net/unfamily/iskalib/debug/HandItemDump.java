@@ -48,7 +48,6 @@ public final class HandItemDump {
      */
     public static int dumpHands(ServerPlayer player, CommandSourceStack source) {
         dumpHandSlot(player, source, EquipmentSlot.MAINHAND);
-        dumpHandSlot(player, source, EquipmentSlot.OFFHAND);
         return 1;
     }
 
@@ -65,13 +64,19 @@ public final class HandItemDump {
         }
 
         appendItemArgumentLine(source, stack);
+        appendItemArgumentJsonLine(source, stack);
         appendStackJsonLine(source, player, stack);
         appendDetailedDump(source, player, stack);
     }
 
     private static void appendItemArgumentLine(CommandSourceStack source, ItemStack stack) {
-        String itemArg = ItemConverter.formatAsItemArgument(stack);
+        String itemArg = ItemConverter.formatAsKubeJsItemString(stack);
         source.sendSuccess(() -> copyableLine("Item", itemArg, ChatFormatting.AQUA), false);
+    }
+
+    private static void appendItemArgumentJsonLine(CommandSourceStack source, ItemStack stack) {
+        String itemArgJson = ItemConverter.formatAsKubeJsItemStringJson(stack);
+        source.sendSuccess(() -> copyableLine("Item JSON", itemArgJson, ChatFormatting.AQUA), false);
     }
 
     private static void appendStackJsonLine(CommandSourceStack source, ServerPlayer player, ItemStack stack) {
