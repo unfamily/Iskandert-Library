@@ -94,6 +94,8 @@ configurations {
 }
 
 dependencies {
+    annotationProcessor 'org.spongepowered:mixin:0.8.7:processor'
+
     // Specify the version of Minecraft to use.
     // Depending on the plugin applied there are several options. We will assume you applied the userdev plugin as shown above.
     // The group for userdev is net.neoforged, the module name is neoforge, and the version is the same as the neoforge version.
@@ -164,6 +166,18 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+    options.compilerArgs.addAll(
+            '-AoutRefMapFile=' + layout.buildDirectory.file("${mod_id}.refmap.json").get().asFile.absolutePath,
+            '-Amixin.configs=' + mod_id + '.mixins.json'
+    )
+}
+
+tasks.named('jar', Jar).configure {
+    def mid = project.mod_id
+    from(layout.buildDirectory.file("${mid}.refmap.json")) {
+        rename { "${mid}.refmap.json" }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
