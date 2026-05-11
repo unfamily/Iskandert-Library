@@ -576,6 +576,10 @@ public class StructureLoader {
             if (structureJson.has("hidden")) {
                 definition.setHidden(structureJson.get("hidden").getAsBoolean());
             }
+
+            if (structureJson.has("skip_if_mobs_in_bounds")) {
+                definition.setSkipIfMobsInBounds(structureJson.get("skip_if_mobs_in_bounds").getAsBoolean());
+            }
             
             // Register structure definition
             STRUCTURES.put(structureId, definition);

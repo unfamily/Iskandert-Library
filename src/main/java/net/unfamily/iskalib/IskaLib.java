@@ -18,7 +18,6 @@ public class IskaLib {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public IskaLib(IEventBus modEventBus, ModContainer modContainer) {
-        IskaLibRecipes.register(modEventBus);
         modContainer.registerConfig(ModConfig.Type.COMMON, IskaLibConfig.SPEC);
         NeoForge.EVENT_BUS.register(ExplosionSystem.class);
         if (isPhysicalClient()) {
