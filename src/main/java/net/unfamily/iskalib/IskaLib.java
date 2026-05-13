@@ -12,6 +12,7 @@ import com.mojang.logging.LogUtils;
 import net.unfamily.iskalib.client.marker.VanillaWorldMarkerClientHooks;
 import net.unfamily.iskalib.explosion.ExplosionSystem;
 
+//change_hash
 @Mod(IskaLib.MOD_ID)
 public class IskaLib {
     public static final String MOD_ID = "iska_lib";

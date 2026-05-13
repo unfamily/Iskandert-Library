@@ -3,4 +3,4 @@
 --assetIndex
 asset-index
 --assetsDir
-/home/unfamily/.jdks/ms-17.0.18/caches/minecraft/assets
+/home/unfamily/.gradle/caches/minecraft/assets
