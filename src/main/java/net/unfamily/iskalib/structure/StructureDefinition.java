@@ -33,8 +33,6 @@ public class StructureDefinition {
     private List<String> stages;
     private boolean machine = true; // If false, not visible in Structure Placer Machine GUI
     private boolean hidden = false; // If true, only visible via commands
-    /** When true, placement is skipped if any non-player living entity intersects the structure bounds. */
-    private boolean skipIfMobsInBounds = false;
 
     /**
      * Definition of an icon for the structure
@@ -107,8 +105,6 @@ public class StructureDefinition {
     public void setMachine(boolean machine) { this.machine = machine; }
     public boolean isHidden() { return hidden; }
     public void setHidden(boolean hidden) { this.hidden = hidden; }
-    public boolean isSkipIfMobsInBounds() { return skipIfMobsInBounds; }
-    public void setSkipIfMobsInBounds(boolean skipIfMobsInBounds) { this.skipIfMobsInBounds = skipIfMobsInBounds; }
 
     /**
      * Finds the position of the structure's center (character '@')
@@ -193,7 +189,6 @@ public class StructureDefinition {
         if (refresh) structureObj.addProperty("refresh", refresh);
         if (!machine) structureObj.addProperty("machine", machine); // Only save if false (non-default)
         if (hidden) structureObj.addProperty("hidden", hidden); // Only save if true (non-default)
-        if (skipIfMobsInBounds) structureObj.addProperty("skip_if_mobs_in_bounds", true);
 
         // Add can_replace if present
         if (canReplace != null && !canReplace.isEmpty()) {
