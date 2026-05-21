@@ -1,11 +1,9 @@
 package net.unfamily.iskalib.gas;
 
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.NeoForge;
@@ -23,7 +21,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Public API: consumer mods register gases on their mod event bus.
+ * Public API: consumer mods register gases on their mod event bus (NeoForge 26.1.2+ only).
+ * <p>
+ * Pass the consumer's existing {@link DeferredRegister} instances via {@link GasRegistrationRegisters}
+ * so blocks/items/fluids share one registrar per namespace. Do not create a second {@code DeferredRegister}
+ * for the same mod id.
+ * <p>
+ * Not for Minecraft 1.21.1 — consumers on older lines must ship an in-mod gas copy (see Colossal Reactors 1.21.1).
  */
 public final class IskaLibGases {
     private static final Map<String, ModGasRegistration> BY_MOD = new ConcurrentHashMap<>();
@@ -33,8 +37,8 @@ public final class IskaLibGases {
     private IskaLibGases() {}
 
     /** Called from {@link net.unfamily.iskalib.IskaLib} to wire global interaction handlers. */
-    public static void initLibrary(IEventBus modEventBus) {
-        ensureInteractions();
+    public static void initLibrary(IEventBus iskaLibModEventBus) {
+        ensureInteractions(iskaLibModEventBus);
     }
 
     private static void hookClientEventsOnce(IEventBus modEventBus) {
@@ -55,29 +59,38 @@ public final class IskaLibGases {
     }
 
     /**
-     * Queue and register a gas type under {@code modId} with naming convention {@code gas_fluid_{name}}, {@code gas_{name}}, bucket.
+     * Registers a gas using the consumer mod's deferred registers (call after those registers are created,
+     * before or after {@code registers.blocks().register(modEventBus)} — entries are added to the same queues).
      */
-    public static RegisteredGas registerGas(IEventBus modEventBus, String modId, String name, int tintArgb) {
-        return registerGas(modEventBus, new GasSpec(modId, name, tintArgb));
+    public static RegisteredGas registerGas(
+            IEventBus modEventBus,
+            GasRegistrationRegisters registers,
+            String modId,
+            String name,
+            int tintArgb
+    ) {
+        return registerGas(modEventBus, registers, new GasSpec(modId, name, tintArgb));
     }
 
-    public static RegisteredGas registerGas(IEventBus modEventBus, GasSpec spec) {
-        ensureInteractions();
+    public static RegisteredGas registerGas(IEventBus modEventBus, GasRegistrationRegisters registers, GasSpec spec) {
         hookClientEventsOnce(modEventBus);
-        ModGasRegistration reg = BY_MOD.computeIfAbsent(spec.modId(), id -> {
-            ModGasRegistration created = new ModGasRegistration(id);
-            created.attach(modEventBus);
-            return created;
-        });
+        ModGasRegistration reg = BY_MOD.computeIfAbsent(spec.modId(), id -> new ModGasRegistration(registers));
         return reg.register(spec);
     }
 
-    private static void ensureInteractions() {
+    private static void ensureInteractions(IEventBus iskaLibModEventBus) {
         if (!interactionsInitialized) {
             interactionsInitialized = true;
-            NeoForge.EVENT_BUS.addListener(GasFluidInteractions::onRegisterCapabilities);
             NeoForge.EVENT_BUS.addListener(GasFluidInteractions::onRightClickBlock);
         }
+    }
+
+    /**
+     * Call from the consumer mod's {@link net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent}
+     * (same mod bus as {@link GasRegistrationRegisters#blocks()}). Required for bucket/pipe extraction.
+     */
+    public static void registerCapabilities(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent event) {
+        GasFluidInteractions.onRegisterCapabilities(event);
     }
 
     private static final class ModGasRegistration {
@@ -88,20 +101,12 @@ public final class IskaLibGases {
         private final DeferredRegister.Items items;
         private final List<RegisteredGas> registered = new ArrayList<>();
 
-        ModGasRegistration(String modId) {
-            this.modId = modId;
-            this.fluidTypes = DeferredRegister.create(net.neoforged.neoforge.registries.NeoForgeRegistries.Keys.FLUID_TYPES, modId);
-            this.fluids = DeferredRegister.create(BuiltInRegistries.FLUID, modId);
-            this.blocks = DeferredRegister.createBlocks(modId);
-            this.items = DeferredRegister.createItems(modId);
-        }
-
-        void attach(IEventBus bus) {
-            fluidTypes.register(bus);
-            fluids.register(bus);
-            blocks.register(bus);
-            items.register(bus);
-            // RegisterCapabilitiesEvent is NeoForge-global only — wired in ensureInteractions().
+        ModGasRegistration(GasRegistrationRegisters registers) {
+            this.modId = registers.blocks().getNamespace();
+            this.fluidTypes = registers.fluidTypes();
+            this.fluids = registers.fluids();
+            this.blocks = registers.blocks();
+            this.items = registers.items();
         }
 
         RegisteredGas register(GasSpec spec) {
@@ -113,7 +118,7 @@ public final class IskaLibGases {
                 DeferredHolder<FluidType, FluidType> fluidType;
                 DeferredHolder<Fluid, GasFlowingFluid.Source> source;
                 DeferredHolder<Fluid, GasFlowingFluid.Flowing> flowing;
-                DeferredBlock<GasBlock> block;
+                DeferredBlock<GasLiquidBlock> block;
                 DeferredHolder<Item, GasBucketItem> bucket;
             };
 
@@ -132,27 +137,27 @@ public final class IskaLibGases {
 
             AtomicReference<RegisteredGas> gasRef = new AtomicReference<>();
 
+            // Fluids and block before bucket (same order as ModFluids). Bucket must not be .get() during item/fluid construction.
             BaseFlowingFluid.Properties fluidProps = new BaseFlowingFluid.Properties(
                     refs.fluidType,
                     () -> refs.source.get(),
                     () -> refs.flowing.get())
-                    .bucket(() -> refs.bucket.get());
+                    .block(() -> refs.block.get())
+                    .bucket(() -> refs.bucket.isBound() ? refs.bucket.get() : null)
+                    .tickRate(Integer.MAX_VALUE / 4)
+                    .slopeFindDistance(0)
+                    .levelDecreasePerBlock(Integer.MAX_VALUE / 4);
 
             refs.source = fluids.register(spec.fluidSourceId(), () -> new GasFlowingFluid.Source(fluidProps));
             refs.flowing = fluids.register(spec.fluidFlowingId(), () -> new GasFlowingFluid.Flowing(fluidProps));
 
-            refs.block = blocks.register(spec.blockId(), () -> new GasBlock(
-                    GasBlock.defaultProperties(spec.lightLevel()),
-                    gasRef::get,
-                    spec.tickInterval()));
-
-            refs.bucket = items.register(spec.bucketId(), () -> new GasBucketItem(
-                    new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1),
-                    gasRef.get()));
-
             Identifier sourceFluidId = Identifier.fromNamespaceAndPath(modId, spec.fluidSourceId());
             Identifier blockId = Identifier.fromNamespaceAndPath(modId, spec.blockId());
             Identifier bucketId = Identifier.fromNamespaceAndPath(modId, spec.bucketId());
+
+            refs.block = blocks.registerBlock(spec.blockId(),
+                    props -> new GasLiquidBlock(refs.flowing.get(), props, gasRef::get, spec.tickInterval()),
+                    props -> GasLiquidBlock.configureProperties(props, spec.lightLevel()));
 
             RegisteredGas gas = new RegisteredGas(
                     spec,
@@ -164,6 +169,10 @@ public final class IskaLibGases {
                     blockId,
                     bucketId);
             gasRef.set(gas);
+
+            refs.bucket = items.registerItem(spec.bucketId(),
+                    props -> new GasBucketItem(props, gasRef.get(), refs.source),
+                    () -> new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1));
 
             registered.add(gas);
             GasRegistry.register(gas);

@@ -63,6 +63,10 @@ public final class RegisteredGas {
         return flowingFluid.get();
     }
 
+    public DeferredHolder<Block, ? extends Block> blockHolder() {
+        return block;
+    }
+
     public Block block() {
         return block.get();
     }

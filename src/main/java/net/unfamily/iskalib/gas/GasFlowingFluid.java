@@ -1,9 +1,10 @@
 package net.unfamily.iskalib.gas;
 
+import net.minecraft.world.level.LevelReader;
 import net.neoforged.neoforge.fluids.BaseFlowingFluid;
 
 /**
- * Logical fluid for gas stacks and ports. Does not spread in the world (no {@link net.minecraft.world.level.block.LiquidBlock}).
+ * Gas fluids for stacks/ports/world block. Does not flood — {@link GasLiquidBlock} handles upward movement.
  */
 public class GasFlowingFluid {
 
@@ -13,11 +14,31 @@ public class GasFlowingFluid {
         public Source(Properties properties) {
             super(properties);
         }
+
+        @Override
+        protected int getSlopeFindDistance(LevelReader level) {
+            return 0;
+        }
+
+        @Override
+        protected int getDropOff(LevelReader level) {
+            return Integer.MAX_VALUE / 2;
+        }
     }
 
     public static final class Flowing extends BaseFlowingFluid.Flowing {
         public Flowing(Properties properties) {
             super(properties);
+        }
+
+        @Override
+        protected int getSlopeFindDistance(LevelReader level) {
+            return 0;
+        }
+
+        @Override
+        protected int getDropOff(LevelReader level) {
+            return Integer.MAX_VALUE / 2;
         }
     }
 }

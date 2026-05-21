@@ -16,6 +16,9 @@ public final class IskaLibGasBlockModels {
 
     public static void registerBlockTintSources(RegisterColorHandlersEvent.BlockTintSources event) {
         for (RegisteredGas gas : GasRegistry.all()) {
+            if (!gas.blockHolder().isBound()) {
+                continue;
+            }
             event.getBlockColors().register(List.of(BlockTintSources.constant(gas.tintArgb())), gas.block());
         }
     }
