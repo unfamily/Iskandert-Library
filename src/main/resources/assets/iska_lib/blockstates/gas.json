@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "collectable=false": { "model": "iska_lib:block/gas" },
+    "collectable=true": { "model": "iska_lib:block/gas" }
+  }
+}
