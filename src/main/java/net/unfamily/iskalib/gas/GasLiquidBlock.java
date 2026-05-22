@@ -1,7 +1,7 @@
 package net.unfamily.iskalib.gas;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
@@ -11,9 +11,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -33,12 +35,12 @@ import java.util.function.Supplier;
 
 /**
  * Rising gas fluid in the world: no flooding, moves upward on a schedule, extractable only at the column top.
- * Pump/bucket compatible via standard fluid block + drain-only capability when {@link #isExtractableAt}.
+ * Renders as a full-block model with no collision; interaction hitbox only at the column top.
  */
 public class GasLiquidBlock extends LiquidBlock {
 
     public static final BooleanProperty COLLECTABLE = BooleanProperty.create("collectable");
-    private static final VoxelShape SHAPE = Shapes.box(0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
+    private static final VoxelShape FULL_BLOCK = Shapes.block();
 
     private final Supplier<RegisteredGas> gas;
     private final int tickInterval;
@@ -58,9 +60,6 @@ public class GasLiquidBlock extends LiquidBlock {
         return isGasFluidBlock(state) && state.getValue(COLLECTABLE);
     }
 
-    /**
-     * Top of a gas column: no registered gas fluid block directly above (fixes extraction under another steam block).
-     */
     public static boolean isTopOfColumn(Level level, BlockPos pos, @Nullable RegisteredGas expected) {
         RegisteredGas at = GasRegistry.fromState(level.getBlockState(pos));
         if (at == null || (expected != null && at != expected)) {
@@ -91,12 +90,25 @@ public class GasLiquidBlock extends LiquidBlock {
     }
 
     @Override
+    protected RenderShape getRenderShape(BlockState state) {
+        return RenderShape.MODEL;
+    }
+
+    @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return SHAPE;
+        return Shapes.empty();
     }
 
     @Override
     protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+        return Shapes.empty();
+    }
+
+    @Override
+    protected VoxelShape getInteractionShape(BlockState state, BlockGetter level, BlockPos pos) {
+        if (level instanceof Level world && isExtractableAt(world, pos, null)) {
+            return FULL_BLOCK;
+        }
         return Shapes.empty();
     }
 
@@ -141,10 +153,10 @@ public class GasLiquidBlock extends LiquidBlock {
 
     @Override
     protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
-        super.onPlace(state, level, pos, oldState, movedByPiston);
-        if (!state.getValue(COLLECTABLE)) {
-            schedule(level, pos);
+        if (cullNonSource(level, pos)) {
+            return;
         }
+        wakeAndSchedule(level, pos);
     }
 
     @Override
@@ -156,8 +168,47 @@ public class GasLiquidBlock extends LiquidBlock {
             @Nullable net.minecraft.world.level.redstone.Orientation orientation,
             boolean movedByPiston
     ) {
-        super.neighborChanged(state, level, pos, neighbor, orientation, movedByPiston);
-        if (!state.getValue(COLLECTABLE) && level.getBlockState(pos).getBlock() == this) {
+        if (level.getBlockState(pos).getBlock() == this) {
+            wakeAndSchedule(level, pos);
+        }
+    }
+
+    @Override
+    protected BlockState updateShape(
+            BlockState state,
+            LevelReader level,
+            ScheduledTickAccess ticks,
+            BlockPos pos,
+            Direction direction,
+            BlockPos neighborPos,
+            BlockState neighborState,
+            RandomSource random
+    ) {
+        return state;
+    }
+
+    private void wakeAndSchedule(Level level, BlockPos pos) {
+        if (level.isClientSide()) {
+            return;
+        }
+        if (cullNonSource(level, pos)) {
+            return;
+        }
+        BlockState live = level.getBlockState(pos);
+        if (live.getBlock() != this) {
+            return;
+        }
+        RegisteredGas registered = gas.get();
+        if (registered == null) {
+            return;
+        }
+        if (live.getValue(COLLECTABLE) && shouldRise(level, pos, registered)) {
+            live = live.setValue(COLLECTABLE, false);
+            level.setBlock(pos, live, Block.UPDATE_ALL);
+        } else if (live.getValue(COLLECTABLE) && shouldMarkCollectable(level, pos, registered)) {
+            return;
+        }
+        if (!live.getValue(COLLECTABLE)) {
             schedule(level, pos);
         }
     }
@@ -172,9 +223,50 @@ public class GasLiquidBlock extends LiquidBlock {
         return level.getMaxY();
     }
 
+    private static boolean shouldRise(Level level, BlockPos pos, RegisteredGas gas) {
+        if (pos.getY() >= ceilingY(level)) {
+            return false;
+        }
+        BlockState above = level.getBlockState(pos.above());
+        if (isSameGasFluid(above, gas)) {
+            return false;
+        }
+        return above.canBeReplaced();
+    }
+
+    private static boolean shouldMarkCollectable(Level level, BlockPos pos, RegisteredGas gas) {
+        return isTopOfColumn(level, pos, gas) && !shouldRise(level, pos, gas);
+    }
+
+    /**
+     * Flowing / partial fluid blocks must not persist — only full source columns rise.
+     */
+    private boolean cullNonSource(Level level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (state.getBlock() != this) {
+            return true;
+        }
+        RegisteredGas registered = gas.get();
+        if (registered == null) {
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            return true;
+        }
+        FluidState fluidState = level.getFluidState(pos);
+        if (state.getValue(LEVEL) != 0
+                || !fluidState.isSource()
+                || fluidState.getType() != registered.sourceFluid()) {
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            return true;
+        }
+        return false;
+    }
+
     @Override
     protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
-        if (state.getBlock() != this || state.getValue(COLLECTABLE)) {
+        if (state.getBlock() != this) {
+            return;
+        }
+        if (cullNonSource(level, pos)) {
             return;
         }
         RegisteredGas registered = gas.get();
@@ -183,6 +275,23 @@ public class GasLiquidBlock extends LiquidBlock {
         }
 
         BlockState live = level.getBlockState(pos);
+        if (!isGasFluidBlock(live)) {
+            return;
+        }
+
+        if (live.getValue(COLLECTABLE)) {
+            if (shouldRise(level, pos, registered)) {
+                live = live.setValue(COLLECTABLE, false);
+                level.setBlock(pos, live, Block.UPDATE_ALL);
+            } else if (shouldMarkCollectable(level, pos, registered)) {
+                return;
+            } else {
+                live = live.setValue(COLLECTABLE, false);
+                level.setBlock(pos, live, Block.UPDATE_ALL);
+            }
+        }
+
+        live = level.getBlockState(pos);
         if (!isGasFluidBlock(live) || live.getValue(COLLECTABLE)) {
             return;
         }
@@ -190,8 +299,8 @@ public class GasLiquidBlock extends LiquidBlock {
         BlockPos above = pos.above();
         BlockState aboveState = level.getBlockState(above);
 
-        if (pos.getY() >= ceilingY(level) || (isBlockedAbove(aboveState) && !isSameGasFluid(aboveState, registered))) {
-            if (isTopOfColumn(level, pos, registered)) {
+        if (!shouldRise(level, pos, registered)) {
+            if (shouldMarkCollectable(level, pos, registered)) {
                 level.setBlock(pos, live.setValue(COLLECTABLE, true), Block.UPDATE_ALL);
             }
             return;
@@ -202,20 +311,17 @@ public class GasLiquidBlock extends LiquidBlock {
             return;
         }
 
-        if (!aboveState.canBeReplaced()) {
-            if (isTopOfColumn(level, pos, registered)) {
-                level.setBlock(pos, live.setValue(COLLECTABLE, true), Block.UPDATE_ALL);
-            }
-            return;
-        }
-
-        Fluid source = registered.sourceFluid();
-        BlockState fluidAbove = source.defaultFluidState().createLegacyBlock();
-        if (!level.setBlock(above, fluidAbove, Block.UPDATE_ALL)) {
+        BlockState fluidAbove = registered.block().defaultBlockState().setValue(COLLECTABLE, false);
+        BlockState toRestore = live;
+        if (!level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL)) {
             schedule(level, pos);
             return;
         }
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        if (!level.setBlock(above, fluidAbove, Block.UPDATE_ALL)) {
+            level.setBlock(pos, toRestore, Block.UPDATE_ALL);
+            schedule(level, pos);
+            return;
+        }
         schedule(level, above);
     }
 
@@ -225,10 +331,6 @@ public class GasLiquidBlock extends LiquidBlock {
         }
         RegisteredGas at = GasRegistry.fromState(state);
         return at == gas;
-    }
-
-    private static boolean isBlockedAbove(BlockState above) {
-        return !above.canBeReplaced();
     }
 
     public static BlockBehaviour.Properties configureProperties(BlockBehaviour.Properties props, int lightLevel) {

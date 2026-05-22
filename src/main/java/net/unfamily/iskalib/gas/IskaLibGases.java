@@ -156,7 +156,7 @@ public final class IskaLibGases {
             Identifier bucketId = Identifier.fromNamespaceAndPath(modId, spec.bucketId());
 
             refs.block = blocks.registerBlock(spec.blockId(),
-                    props -> new GasLiquidBlock(refs.flowing.get(), props, gasRef::get, spec.tickInterval()),
+                    props -> new GasLiquidBlock(refs.source.get(), props, gasRef::get, spec.tickInterval()),
                     props -> GasLiquidBlock.configureProperties(props, spec.lightLevel()));
 
             RegisteredGas gas = new RegisteredGas(
@@ -164,7 +164,7 @@ public final class IskaLibGases {
                     refs.source,
                     refs.flowing,
                     refs.block,
-                    refs.bucket,
+                    () -> refs.bucket,
                     sourceFluidId,
                     blockId,
                     bucketId);

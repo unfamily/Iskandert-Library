@@ -4,7 +4,8 @@
   "compatibilityLevel": "JAVA_25",
   "refmap": "iska_lib.refmap.json",
   "mixins": [
-    "CraftingInputMixin"
+    "CraftingInputMixin",
+    "CauldronFluidContentMixin"
   ],
   "minVersion": "0.8"
 }

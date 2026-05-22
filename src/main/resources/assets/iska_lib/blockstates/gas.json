@@ -1,6 +1,100 @@
 {
   "variants": {
-    "collectable=false": { "model": "iska_lib:block/gas" },
-    "collectable=true": { "model": "iska_lib:block/gas" }
+    "collectable=false,level=0": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=0": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=1": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=1": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=2": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=2": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=3": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=3": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=4": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=4": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=5": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=5": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=6": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=6": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=7": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=7": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=8": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=8": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=9": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=9": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=10": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=10": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=11": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=11": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=12": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=12": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=13": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=13": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=14": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=14": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=false,level=15": {
+      "model": "iska_lib:block/gas"
+    },
+    "collectable=true,level=15": {
+      "model": "iska_lib:block/gas"
+    }
   }
 }

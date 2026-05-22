@@ -6,6 +6,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.registries.DeferredHolder;
 
+import java.util.function.Supplier;
+
 /**
  * Handle for a fully registered gas type (fluids, block, bucket).
  */
@@ -14,7 +16,7 @@ public final class RegisteredGas {
     private final DeferredHolder<Fluid, ? extends Fluid> sourceFluid;
     private final DeferredHolder<Fluid, ? extends Fluid> flowingFluid;
     private final DeferredHolder<Block, ? extends Block> block;
-    private final DeferredHolder<Item, ? extends Item> bucketItem;
+    private final Supplier<DeferredHolder<Item, ? extends Item>> bucketItem;
     private final Identifier sourceFluidId;
     private final Identifier blockId;
     private final Identifier bucketId;
@@ -24,7 +26,7 @@ public final class RegisteredGas {
             DeferredHolder<Fluid, ? extends Fluid> sourceFluid,
             DeferredHolder<Fluid, ? extends Fluid> flowingFluid,
             DeferredHolder<Block, ? extends Block> block,
-            DeferredHolder<Item, ? extends Item> bucketItem,
+            Supplier<DeferredHolder<Item, ? extends Item>> bucketItem,
             Identifier sourceFluidId,
             Identifier blockId,
             Identifier bucketId
@@ -71,8 +73,17 @@ public final class RegisteredGas {
         return block.get();
     }
 
+    public boolean isBucketReady() {
+        DeferredHolder<Item, ? extends Item> holder = bucketItem.get();
+        return holder != null && holder.isBound();
+    }
+
     public Item bucketItem() {
-        return bucketItem.get();
+        DeferredHolder<Item, ? extends Item> holder = bucketItem.get();
+        if (holder == null) {
+            throw new IllegalStateException("Bucket not registered yet for gas " + spec.modId() + ":" + spec.name());
+        }
+        return holder.get();
     }
 
     public Identifier sourceFluidId() {
