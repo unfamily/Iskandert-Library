@@ -6,6 +6,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -14,6 +15,7 @@ import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.fluids.capability.wrappers.FluidBucketWrapper;
 import net.minecraft.world.phys.BlockHitResult;
 import net.neoforged.neoforge.transfer.fluid.FluidUtil;
 import net.unfamily.iskalib.transfer.LegacyIFluidHandlerResourceHandler;
@@ -28,6 +30,7 @@ public final class GasFluidInteractions {
 
     public static void onRegisterCapabilities(RegisterCapabilitiesEvent event) {
         GasRegistry.bindBlocks();
+        registerGasBucketItemCapabilities(event);
         for (RegisteredGas gas : IskaLibGases.allRegisteredGases()) {
             if (!(gas.block() instanceof GasLiquidBlock)) {
                 continue;
@@ -42,6 +45,26 @@ public final class GasFluidInteractions {
                                 new GasBlockFluidHandler(gas, level, pos));
                     },
                     gas.block());
+        }
+    }
+
+    /**
+     * NeoForge only auto-registers fluid item capabilities for exact {@link net.minecraft.world.item.BucketItem}
+     * classes, not {@link GasBucketItem} subclasses — required for external tank mods and {@link FluidUtil}.
+     */
+    private static void registerGasBucketItemCapabilities(RegisterCapabilitiesEvent event) {
+        for (RegisteredGas gas : IskaLibGases.allRegisteredGases()) {
+            if (!gas.isBucketReady()) {
+                continue;
+            }
+            Item item = gas.bucketItem();
+            if (!(item instanceof GasBucketItem)) {
+                continue;
+            }
+            event.registerItem(
+                    Capabilities.Fluid.ITEM,
+                    (stack, context) -> LegacyIFluidHandlerResourceHandler.wrap(new FluidBucketWrapper(stack)),
+                    item);
         }
     }
 

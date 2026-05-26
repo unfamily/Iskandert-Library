@@ -49,6 +49,8 @@ public final class MarkRenderer {
     private static final MarkRenderer INSTANCE = new MarkRenderer();
     private final Map<BlockPos, MarkBlockData> highlightedBlocks = new ConcurrentHashMap<>();
     private final Map<BlockPos, MarkBlockData> billboardMarkers = new ConcurrentHashMap<>();
+    /** Footprint preview markers keyed by builder block position. */
+    private final Map<BlockPos, Map<BlockPos, MarkBlockData>> billboardMarkersByOwner = new ConcurrentHashMap<>();
 
     private MarkRenderer() {}
 
@@ -106,6 +108,35 @@ public final class MarkRenderer {
     public void clearHighlightedBlocks() {
         highlightedBlocks.clear();
         billboardMarkers.clear();
+        billboardMarkersByOwner.clear();
+    }
+
+    public void clearBillboardMarkersForOwner(BlockPos owner) {
+        if (owner != null) {
+            billboardMarkersByOwner.remove(owner.immutable());
+        }
+    }
+
+    public void addBillboardMarker(BlockPos owner, BlockPos pos, int color, int durationTicks) {
+        if (owner == null) {
+            addBillboardMarker(pos, color, durationTicks);
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        Runnable add = () -> {
+            if (mc.level == null) {
+                return;
+            }
+            long expire = durationTicks > 0 ? mc.level.getGameTime() + durationTicks : Long.MAX_VALUE;
+            billboardMarkersByOwner
+                    .computeIfAbsent(owner.immutable(), k -> new ConcurrentHashMap<>())
+                    .put(pos.immutable(), new MarkBlockData(color, expire, true));
+        };
+        if (mc.level == null) {
+            mc.execute(add);
+        } else {
+            add.run();
+        }
     }
 
     public void checkPlayerLookingAtMarker() {
@@ -229,7 +260,7 @@ public final class MarkRenderer {
      * @param partialTick reserved for future interpolation
      */
     public void renderWorldMarkers(float partialTick) {
-        if (highlightedBlocks.isEmpty() && billboardMarkers.isEmpty()) {
+        if (highlightedBlocks.isEmpty() && billboardMarkers.isEmpty() && billboardMarkersByOwner.isEmpty()) {
             return;
         }
 
@@ -241,8 +272,11 @@ public final class MarkRenderer {
         long currentTime = mc.level.getGameTime();
         highlightedBlocks.entrySet().removeIf(entry -> entry.getValue().expirationTime <= currentTime);
         billboardMarkers.entrySet().removeIf(entry -> entry.getValue().expirationTime <= currentTime);
+        billboardMarkersByOwner.values().forEach(map ->
+                map.entrySet().removeIf(entry -> entry.getValue().expirationTime <= currentTime));
+        billboardMarkersByOwner.entrySet().removeIf(e -> e.getValue().isEmpty());
 
-        if (highlightedBlocks.isEmpty() && billboardMarkers.isEmpty()) {
+        if (highlightedBlocks.isEmpty() && billboardMarkers.isEmpty() && billboardMarkersByOwner.isEmpty()) {
             return;
         }
 
@@ -258,6 +292,26 @@ public final class MarkRenderer {
         }
         if (!billboardMarkers.isEmpty()) {
             renderBillboardMarkers(mc, pose);
+        }
+        if (!billboardMarkersByOwner.isEmpty()) {
+            renderOwnedBillboardMarkers(mc, pose);
+        }
+    }
+
+    private void renderOwnedBillboardMarkers(Minecraft mc, PoseStack.Pose pose) {
+        Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder bufferBuilder = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        boolean hasVertices = false;
+        for (Map<BlockPos, MarkBlockData> worldMarkers : billboardMarkersByOwner.values()) {
+            for (Map.Entry<BlockPos, MarkBlockData> entry : worldMarkers.entrySet()) {
+                drawSmallCube(bufferBuilder, pose, entry.getKey(), entry.getValue().color);
+                hasVertices = true;
+            }
+        }
+        if (hasVertices) {
+            try (MeshData mesh = bufferBuilder.buildOrThrow()) {
+                markerDrawType().draw(mesh);
+            }
         }
     }
 
