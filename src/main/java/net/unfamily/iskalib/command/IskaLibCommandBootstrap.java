@@ -18,6 +18,7 @@ public final class IskaLibCommandBootstrap {
         MarkerCommand.register(dispatcher);
         StageCommand.register(dispatcher);
         IskaLibDebugCommand.register(dispatcher);
+        ExplosionCommand.register(dispatcher);
         ShopTeamCommand.register(dispatcher);
     }
 }

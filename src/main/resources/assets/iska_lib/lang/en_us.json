@@ -1,3 +1,19 @@
 {
-  "fluid.iska_lib.gas_fluid_example": "Example Gas"
+  "fluid.iska_lib.gas_fluid_example": "Example Gas",
+  "commands.iska_lib.explosion.usage.title": "===== IskaLib Custom Explosion =====",
+  "commands.iska_lib.explosion.usage.horizontal": "- horizontal_radius: X/Z radius of the ellipse (min: 1, no limit)",
+  "commands.iska_lib.explosion.usage.vertical": "- vertical_radius: Y radius of the ellipse (1-1000)",
+  "commands.iska_lib.explosion.usage.interval": "- tick_interval: How often to process blocks (0=instant, no limit)",
+  "commands.iska_lib.explosion.usage.damage": "- damage: Damage to deal to entities (min: 0.0, no limit)",
+  "commands.iska_lib.explosion.usage.break_unbreakable": "- break_unbreakable: Whether to break bedrock and barriers (true/false)",
+  "commands.iska_lib.explosion.created": "Explosion #%s created! Center: %s, %s, %s | Radii: %sx%s | Tick: %s",
+  "commands.iska_lib.explosion.stopped": "Stopped %s active explosions",
+  "commands.iska_lib.explosion.stopped_one": "Stopped explosion #%s",
+  "commands.iska_lib.explosion.stop.not_found": "No active explosion with id %s",
+  "commands.iska_lib.explosion.stop.invalid_target": "Invalid stop target '%s' (use all or an active explosion id)",
+  "commands.iska_lib.explosion.none_active": "No active explosions to stop",
+  "commands.iska_lib.explosion.info.none": "No active progressive explosions.",
+  "commands.iska_lib.explosion.info.header": "Active explosions: %s",
+  "commands.iska_lib.explosion.info.entry": "[%s] %s @ %s %s %s | radii %sx%s | %s%% | wave %s/%s | sub-regions %s/%s | blocks %s",
+  "commands.iska_lib.explosion.info.active_front": "  Front at %s %s %s (sub-region %s%%)"
 }

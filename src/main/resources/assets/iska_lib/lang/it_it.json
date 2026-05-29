@@ -1,0 +1,18 @@
+{
+  "commands.iska_lib.explosion.usage.title": "===== Esplosione Custom IskaLib =====",
+  "commands.iska_lib.explosion.usage.horizontal": "- raggio_orizzontale: Raggio X/Z dell'ellisse (min: 1, no limite)",
+  "commands.iska_lib.explosion.usage.vertical": "- raggio_verticale: Raggio Y dell'ellisse (1-1000)",
+  "commands.iska_lib.explosion.usage.interval": "- tick_interval: Ogni quanti tick processare i blocchi (0=istantaneo, no limite)",
+  "commands.iska_lib.explosion.usage.damage": "- danno: Danno da infliggere alle entità (min: 0.0, no limite)",
+  "commands.iska_lib.explosion.usage.break_unbreakable": "- rompi_indistruttibili: Se rompere bedrock e barriere (true/false)",
+  "commands.iska_lib.explosion.created": "Esplosione #%s creata! Centro: %s, %s, %s | Raggi: %sx%s | Tick: %s",
+  "commands.iska_lib.explosion.stopped": "Fermate %s esplosioni attive",
+  "commands.iska_lib.explosion.stopped_one": "Fermata esplosione #%s",
+  "commands.iska_lib.explosion.stop.not_found": "Nessuna esplosione attiva con id %s",
+  "commands.iska_lib.explosion.stop.invalid_target": "Target stop non valido '%s' (usa all o un id esplosione attivo)",
+  "commands.iska_lib.explosion.none_active": "Nessuna esplosione attiva da fermare",
+  "commands.iska_lib.explosion.info.none": "Nessuna esplosione progressiva attiva.",
+  "commands.iska_lib.explosion.info.header": "Esplosioni attive: %s",
+  "commands.iska_lib.explosion.info.entry": "[%s] %s @ %s %s %s | raggi %sx%s | %s%% | onda %s/%s | sub-regioni %s/%s | blocchi %s",
+  "commands.iska_lib.explosion.info.active_front": "  Fronte a %s %s %s (sub-regione %s%%)"
+}
