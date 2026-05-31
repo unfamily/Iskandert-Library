@@ -12,6 +12,7 @@ import com.mojang.logging.LogUtils;
 import net.unfamily.iskalib.client.marker.VanillaWorldMarkerClientHooks;
 import net.unfamily.iskalib.explosion.ExplosionSystem;
 import net.unfamily.iskalib.gas.IskaLibGases;
+import net.unfamily.iskalib.liquid.IskaLibLiquids;
 
 //change_hash
 @Mod(IskaLib.MOD_ID)
@@ -22,6 +23,7 @@ public class IskaLib {
     public IskaLib(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.COMMON, IskaLibConfig.SPEC);
         IskaLibGases.initLibrary(modEventBus);
+        IskaLibLiquids.initLibrary(modEventBus);
         NeoForge.EVENT_BUS.register(ExplosionSystem.class);
         if (isPhysicalClient()) {
             VanillaWorldMarkerClientHooks.registerIfNeeded(NeoForge.EVENT_BUS);
