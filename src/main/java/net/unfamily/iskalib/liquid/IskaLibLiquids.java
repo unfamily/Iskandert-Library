@@ -147,7 +147,7 @@ public final class IskaLibLiquids {
             Identifier bucketId = Identifier.fromNamespaceAndPath(modId, spec.bucketId());
 
             refs.block = blocks.registerBlock(spec.blockId(),
-                    props -> new LiquidBlock(refs.source.get(), props),
+                    props -> new LiquidBlock(refs.flowing.get(), props),
                     props -> props.mapColor(MapColor.COLOR_GRAY)
                             .replaceable()
                             .strength(100.0F)
