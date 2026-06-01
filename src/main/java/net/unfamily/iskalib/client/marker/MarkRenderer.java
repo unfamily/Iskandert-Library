@@ -270,6 +270,7 @@ public final class MarkRenderer {
         }
 
         long currentTime = mc.level.getGameTime();
+        billboardMarkersByOwner.entrySet().removeIf(entry -> mc.level.getBlockState(entry.getKey()).isAir());
         highlightedBlocks.entrySet().removeIf(entry -> entry.getValue().expirationTime <= currentTime);
         billboardMarkers.entrySet().removeIf(entry -> entry.getValue().expirationTime <= currentTime);
         billboardMarkersByOwner.values().forEach(map ->
