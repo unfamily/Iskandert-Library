@@ -38,7 +38,7 @@ public final class WorldBackupGateConfig {
     }
 
     public String registryKey() {
-        return hostModId + "|" + gateId;
+        return hostModId + "_" + gateId;
     }
 
     public String hostModId() {

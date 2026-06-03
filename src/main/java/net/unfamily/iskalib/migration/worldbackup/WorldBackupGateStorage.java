@@ -8,8 +8,10 @@ import net.minecraft.world.level.storage.LevelStorageSource;
 import net.unfamily.iskalib.IskaLib;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 /**
  * Per-world backup-gate state under {@code world/data/} (not per-player).
@@ -22,6 +24,10 @@ public final class WorldBackupGateStorage {
 
     public static Path worldDataDir(LevelStorageSource.LevelStorageAccess access) {
         return access.getLevelPath(LevelResource.ROOT).resolve("data");
+    }
+
+    private static Path ackMarkerPath(Path dataDir, WorldBackupGateConfig config) {
+        return dataDir.resolve("iska_lib_backup_ack_" + config.hostModId() + "_" + config.gateId() + ".marker");
     }
 
     public static boolean hasLegacyWorldData(Path dataDir, WorldBackupGateConfig config) {
@@ -37,6 +43,9 @@ public final class WorldBackupGateStorage {
     }
 
     public static boolean isAcknowledged(Path dataDir, WorldBackupGateConfig config) {
+        if (Files.isRegularFile(ackMarkerPath(dataDir, config))) {
+            return true;
+        }
         if (isAcknowledgedInGateFile(dataDir, config.registryKey())) {
             return true;
         }
@@ -44,22 +53,55 @@ public final class WorldBackupGateStorage {
     }
 
     public static boolean requiresBackupPrompt(Path dataDir, WorldBackupGateConfig config) {
-        return !isAcknowledged(dataDir, config) && hasLegacyWorldData(dataDir, config);
+        if (!hasLegacyWorldData(dataDir, config)) {
+            return false;
+        }
+        return !isAcknowledged(dataDir, config);
     }
 
     public static void acknowledgeOnDisk(Path dataDir, WorldBackupGateConfig config, String modVersion) {
         try {
             Files.createDirectories(dataDir);
-            CompoundTag root = readGateFile(dataDir);
-            CompoundTag gates = root.contains("gates") ? root.getCompound("gates") : new CompoundTag();
-            CompoundTag entry = new CompoundTag();
-            entry.putString("version", modVersion);
-            gates.put(config.registryKey(), entry);
-            root.put("gates", gates);
-            writeGateFile(dataDir, root);
+            Files.writeString(
+                    ackMarkerPath(dataDir, config),
+                    modVersion,
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.SYNC);
+            writeGateFileEntry(dataDir, config, modVersion);
+            writeLegacyAck(dataDir, config);
         } catch (IOException e) {
             IskaLib.LOGGER.warn("Failed to write backup gate ack for {}: {}", config.registryKey(), e.getMessage());
         }
+    }
+
+    private static void writeGateFileEntry(Path dataDir, WorldBackupGateConfig config, String modVersion) throws IOException {
+        CompoundTag root = readGateFile(dataDir);
+        CompoundTag gates = root.contains("gates") ? root.getCompound("gates") : new CompoundTag();
+        CompoundTag entry = new CompoundTag();
+        entry.putString("version", modVersion);
+        gates.put(config.registryKey(), entry);
+        root.put("gates", gates);
+        NbtIo.writeCompressed(root, dataDir.resolve(GATES_FILE));
+    }
+
+    private static void writeLegacyAck(Path dataDir, WorldBackupGateConfig config) throws IOException {
+        if (!config.hasLegacyAckMigration()) {
+            return;
+        }
+        Path path = dataDir.resolve(config.legacyAckSavedDataName() + ".dat");
+        CompoundTag root;
+        if (Files.isRegularFile(path)) {
+            root = NbtIo.readCompressed(path, NbtAccounter.create(1048576L));
+            if (root == null) {
+                root = new CompoundTag();
+            }
+        } else {
+            root = new CompoundTag();
+        }
+        root.putBoolean(config.legacyAckNbtKey(), true);
+        NbtIo.writeCompressed(root, path);
     }
 
     private static boolean isAcknowledgedInGateFile(Path dataDir, String registryKey) {
@@ -95,9 +137,5 @@ public final class WorldBackupGateStorage {
         }
         CompoundTag tag = NbtIo.readCompressed(path, NbtAccounter.create(1048576L));
         return tag != null ? tag : new CompoundTag();
-    }
-
-    private static void writeGateFile(Path dataDir, CompoundTag root) throws IOException {
-        NbtIo.writeCompressed(root, dataDir.resolve(GATES_FILE));
     }
 }

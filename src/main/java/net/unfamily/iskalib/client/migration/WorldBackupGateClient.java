@@ -28,10 +28,11 @@ public final class WorldBackupGateClient {
         minecraft.setScreen(new BackupConfirmScreen(
                 onCancel,
                 (makeBackup, ignored) -> {
+                    // Persist world ack before continuing load (both backup and skip buttons call proceed).
+                    WorldBackupGate.acknowledgeOnDisk(dataDir, config);
                     if (makeBackup) {
                         EditWorldScreen.makeBackupAndShowToast(access);
                     }
-                    WorldBackupGate.acknowledgeOnDisk(dataDir, config);
                     onProceed.run();
                 },
                 Component.translatable(config.titleKey()),
