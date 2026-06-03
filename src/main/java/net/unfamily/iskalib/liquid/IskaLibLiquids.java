@@ -1,10 +1,11 @@
 package net.unfamily.iskalib.liquid;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
@@ -22,11 +23,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Public API: consumer mods register normal liquids on their mod event bus (NeoForge 26.1.2+).
+ * Public API: consumer mods register normal liquids on their mod event bus.
  * Mirrors {@link net.unfamily.iskalib.gas.IskaLibGases} and Colossal Reactors {@code ModFluids.registerTintedFluid}.
  * <p>
  * Pass the consumer's existing {@link DeferredRegister} instances via {@link LiquidRegistrationRegisters}.
- * Not for Minecraft 1.21.1 — consumers on older lines ship an in-mod copy (see IskaUtils {@code ModFluids}).
  */
 public final class IskaLibLiquids {
     private static final Map<String, ModLiquidRegistration> BY_MOD = new ConcurrentHashMap<>();
@@ -42,7 +42,7 @@ public final class IskaLibLiquids {
         if (!isPhysicalClient() || !CLIENT_HOOKED.add(modEventBus)) {
             return;
         }
-        modEventBus.addListener(net.unfamily.iskalib.client.liquid.IskaLibLiquidFluidModels::registerFluidModels);
+        modEventBus.addListener(net.unfamily.iskalib.client.IskaLibFluidClient::registerClientExtensions);
     }
 
     private static boolean isPhysicalClient() {
@@ -142,24 +142,25 @@ public final class IskaLibLiquids {
             refs.source = fluids.register(spec.fluidSourceId(), () -> new BaseFlowingFluid.Source(fluidProps));
             refs.flowing = fluids.register(spec.fluidFlowingId(), () -> new BaseFlowingFluid.Flowing(fluidProps));
 
-            Identifier sourceFluidId = Identifier.fromNamespaceAndPath(modId, spec.fluidSourceId());
-            Identifier blockId = Identifier.fromNamespaceAndPath(modId, spec.blockId());
-            Identifier bucketId = Identifier.fromNamespaceAndPath(modId, spec.bucketId());
+            ResourceLocation sourceFluidId = ResourceLocation.fromNamespaceAndPath(modId, spec.fluidSourceId());
+            ResourceLocation blockId = ResourceLocation.fromNamespaceAndPath(modId, spec.blockId());
+            ResourceLocation bucketId = ResourceLocation.fromNamespaceAndPath(modId, spec.bucketId());
 
-            refs.block = blocks.registerBlock(spec.blockId(),
-                    props -> new LiquidBlock(refs.flowing.get(), props),
-                    props -> props.mapColor(MapColor.COLOR_GRAY)
+            refs.block = blocks.register(spec.blockId(), () -> new LiquidBlock(
+                    refs.flowing.get(),
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.COLOR_GRAY)
                             .replaceable()
                             .strength(100.0F)
                             .pushReaction(PushReaction.DESTROY)
                             .noLootTable()
                             .liquid()
-                            .lightLevel(state -> spec.lightLevel()));
+                            .lightLevel(state -> spec.lightLevel())));
 
             if (spec.registerBucket()) {
-                refs.bucket = items.registerItem(spec.bucketId(),
-                        props -> new net.minecraft.world.item.BucketItem(refs.source.get(), props),
-                        () -> new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1));
+                refs.bucket = items.register(spec.bucketId(), () -> new net.minecraft.world.item.BucketItem(
+                        refs.source.get(),
+                        new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1)));
             }
 
             RegisteredLiquid liquid = new RegisteredLiquid(
@@ -167,6 +168,7 @@ public final class IskaLibLiquids {
                     refs.source,
                     refs.flowing,
                     refs.block,
+                    refs.fluidType,
                     () -> refs.bucket,
                     sourceFluidId,
                     blockId,

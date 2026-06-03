@@ -6,12 +6,12 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LiquidBlock;
@@ -40,7 +40,7 @@ import java.util.function.Supplier;
 public class GasLiquidBlock extends LiquidBlock {
 
     public static final BooleanProperty COLLECTABLE = BooleanProperty.create("collectable");
-    private static final VoxelShape FULL_BLOCK = Shapes.block();
+    public static final int DEFAULT_RISE_TICK_INTERVAL = 10;
 
     private final Supplier<RegisteredGas> gas;
     private final int tickInterval;
@@ -95,20 +95,12 @@ public class GasLiquidBlock extends LiquidBlock {
     }
 
     @Override
-    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+    public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         return Shapes.empty();
     }
 
     @Override
-    protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return Shapes.empty();
-    }
-
-    @Override
-    protected VoxelShape getInteractionShape(BlockState state, BlockGetter level, BlockPos pos) {
-        if (level instanceof Level world && isExtractableAt(world, pos, null)) {
-            return FULL_BLOCK;
-        }
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         return Shapes.empty();
     }
 
@@ -118,7 +110,7 @@ public class GasLiquidBlock extends LiquidBlock {
     }
 
     @Override
-    protected InteractionResult useItemOn(
+    protected ItemInteractionResult useItemOn(
             ItemStack stack,
             BlockState state,
             Level level,
@@ -128,7 +120,13 @@ public class GasLiquidBlock extends LiquidBlock {
             BlockHitResult hitResult
     ) {
         InteractionResult result = GasFluidInteractions.useItemOnCollectableGas(stack, state, level, pos, player, hand, hitResult);
-        return result != InteractionResult.PASS ? result : super.useItemOn(stack, state, level, pos, player, hand, hitResult);
+        if (result == InteractionResult.SUCCESS) {
+            return ItemInteractionResult.SUCCESS;
+        }
+        if (result == InteractionResult.FAIL) {
+            return ItemInteractionResult.FAIL;
+        }
+        return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
 
     @Override
@@ -147,12 +145,7 @@ public class GasLiquidBlock extends LiquidBlock {
     }
 
     @Override
-    public ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state, boolean includeData) {
-        return ItemStack.EMPTY;
-    }
-
-    @Override
-    protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
+    public void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
         if (cullNonSource(level, pos)) {
             return;
         }
@@ -160,35 +153,34 @@ public class GasLiquidBlock extends LiquidBlock {
     }
 
     @Override
-    protected void neighborChanged(
-            BlockState state,
-            Level level,
-            BlockPos pos,
-            Block neighbor,
-            @Nullable net.minecraft.world.level.redstone.Orientation orientation,
-            boolean movedByPiston
-    ) {
+    public void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
         if (level.getBlockState(pos).getBlock() == this) {
             wakeAndSchedule(level, pos);
         }
     }
 
-    @Override
-    protected BlockState updateShape(
-            BlockState state,
-            LevelReader level,
-            ScheduledTickAccess ticks,
-            BlockPos pos,
-            Direction direction,
-            BlockPos neighborPos,
-            BlockState neighborState,
-            RandomSource random
-    ) {
-        return state;
+    private boolean cullNonSource(Level level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (state.getBlock() != this) {
+            return true;
+        }
+        RegisteredGas registered = gas.get();
+        if (registered == null) {
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            return true;
+        }
+        FluidState fluidState = level.getFluidState(pos);
+        if (state.getValue(LEVEL) != 0
+                || !fluidState.isSource()
+                || fluidState.getType() != registered.sourceFluid()) {
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            return true;
+        }
+        return false;
     }
 
     private void wakeAndSchedule(Level level, BlockPos pos) {
-        if (level.isClientSide()) {
+        if (level.isClientSide) {
             return;
         }
         if (cullNonSource(level, pos)) {
@@ -214,13 +206,13 @@ public class GasLiquidBlock extends LiquidBlock {
     }
 
     private void schedule(Level level, BlockPos pos) {
-        if (!level.isClientSide()) {
+        if (!level.isClientSide) {
             level.scheduleTick(pos, this, tickInterval);
         }
     }
 
     private static int ceilingY(Level level) {
-        return level.getMaxY();
+        return level.getMaxBuildHeight() - 1;
     }
 
     private static boolean shouldRise(Level level, BlockPos pos, RegisteredGas gas) {
@@ -238,31 +230,8 @@ public class GasLiquidBlock extends LiquidBlock {
         return isTopOfColumn(level, pos, gas) && !shouldRise(level, pos, gas);
     }
 
-    /**
-     * Flowing / partial fluid blocks must not persist — only full source columns rise.
-     */
-    private boolean cullNonSource(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
-        if (state.getBlock() != this) {
-            return true;
-        }
-        RegisteredGas registered = gas.get();
-        if (registered == null) {
-            level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
-            return true;
-        }
-        FluidState fluidState = level.getFluidState(pos);
-        if (state.getValue(LEVEL) != 0
-                || !fluidState.isSource()
-                || fluidState.getType() != registered.sourceFluid()) {
-            level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
-            return true;
-        }
-        return false;
-    }
-
     @Override
-    protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+    public void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         if (state.getBlock() != this) {
             return;
         }
@@ -333,8 +302,8 @@ public class GasLiquidBlock extends LiquidBlock {
         return at == gas;
     }
 
-    public static BlockBehaviour.Properties configureProperties(BlockBehaviour.Properties props, int lightLevel) {
-        return props
+    public static BlockBehaviour.Properties configureProperties(int lightLevel) {
+        return BlockBehaviour.Properties.of()
                 .mapColor(MapColor.NONE)
                 .noOcclusion()
                 .noLootTable()

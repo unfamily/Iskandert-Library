@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.mojang.serialization.JsonOps;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -14,19 +15,22 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BundleContents;
 import net.unfamily.iskalib.item.ItemConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.commons.lang3.math.Fraction;
 
 /**
- * Server-side dump of held items: item id + component bracket (same as shop / {@code /give} item argument), JSON, then tags / NBT detail.
+ * Server-side dump of held items (aligned with {@code iskandert_utilities_26} / Iskandert Library):
+ * item argument line, Stack JSON, then tags / component detail.
  */
 public final class HandItemDump {
     private static final Logger LOGGER = LoggerFactory.getLogger(HandItemDump.class);
@@ -35,7 +39,6 @@ public final class HandItemDump {
 
     private HandItemDump() {}
 
-    /** Chat / copy payload: no line breaks (NBT SNBT and JSON pretty dumps otherwise span multiple lines). */
     private static String toChatSingleLine(String s) {
         if (s == null || s.isEmpty()) {
             return "";
@@ -44,7 +47,7 @@ public final class HandItemDump {
     }
 
     /**
-     * Dumps main hand and off hand for a player. Always returns {@code 1} when the player exists.
+     * Dumps main hand and off hand for a player.
      */
     public static int dumpHands(ServerPlayer player, CommandSourceStack source) {
         dumpHandSlot(player, source, EquipmentSlot.MAINHAND);
@@ -63,19 +66,19 @@ public final class HandItemDump {
             return;
         }
 
-        appendItemArgumentLine(source, stack);
-        appendItemArgumentJsonLine(source, stack);
+        appendItemArgumentLine(source, player, stack);
+        appendItemArgumentJsonLine(source, player, stack);
         appendStackJsonLine(source, player, stack);
         appendDetailedDump(source, player, stack);
     }
 
-    private static void appendItemArgumentLine(CommandSourceStack source, ItemStack stack) {
-        String itemArg = ItemConverter.formatAsKubeJsItemString(stack);
+    private static void appendItemArgumentLine(CommandSourceStack source, ServerPlayer player, ItemStack stack) {
+        String itemArg = ItemConverter.formatAsKubeJsItemString(stack, player.registryAccess());
         source.sendSuccess(() -> copyableLine("Item", itemArg, ChatFormatting.AQUA), false);
     }
 
-    private static void appendItemArgumentJsonLine(CommandSourceStack source, ItemStack stack) {
-        String itemArgJson = ItemConverter.formatAsKubeJsItemStringJson(stack);
+    private static void appendItemArgumentJsonLine(CommandSourceStack source, ServerPlayer player, ItemStack stack) {
+        String itemArgJson = ItemConverter.formatAsKubeJsItemStringJson(stack, player.registryAccess());
         source.sendSuccess(() -> copyableLine("Item JSON", itemArgJson, ChatFormatting.AQUA), false);
     }
 
@@ -88,6 +91,7 @@ public final class HandItemDump {
 
     private static void appendDetailedDump(CommandSourceStack source, ServerPlayer player, ItemStack stack) {
         String itemIdStr = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+        String itemClass = stack.getItem().getClass().getName();
 
         CompoundTag nbtTag = new CompoundTag();
         nbtTag.putString("components", stack.getComponentsPatch().toString());
@@ -96,14 +100,31 @@ public final class HandItemDump {
         MutableComponent itemIdComponent = Component.literal(itemIdStr)
                 .withStyle(Style.EMPTY
                         .withColor(ChatFormatting.GREEN)
-                        .withClickEvent(new ClickEvent.CopyToClipboard(itemIdStr))
-                        .withHoverEvent(new HoverEvent.ShowText(Component.literal("Click to copy"))));
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, itemIdStr))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                Component.translatable("command.iska_utils.debug.click_to_copy"))));
         source.sendSuccess(() -> itemIdLabel.append(itemIdComponent), false);
+
+        BundleContents contents = stack.get(DataComponents.BUNDLE_CONTENTS);
+        if (contents == null) {
+            source.sendSuccess(() -> Component.literal("BundleContents: <absent>")
+                    .withStyle(ChatFormatting.RED), false);
+        } else {
+            Fraction weight = contents.weight();
+            int itemCountTmp = 0;
+            for (ItemStack ignored : contents.itemsCopy()) {
+                itemCountTmp++;
+            }
+            final int itemCount = itemCountTmp;
+            source.sendSuccess(() -> Component.literal("BundleContents: present | weight=" + weight + " | items=" + itemCount)
+                    .withStyle(ChatFormatting.GREEN), false);
+        }
+        source.sendSuccess(() -> Component.literal("Item Class: " + itemClass).withStyle(ChatFormatting.GRAY), false);
 
         boolean isBlock = stack.getItem() instanceof BlockItem;
         CompoundTag blocksTag = new CompoundTag();
         CompoundTag itemsTag = new CompoundTag();
-        for (String key : nbtTag.keySet()) {
+        for (String key : nbtTag.getAllKeys()) {
             Tag value = nbtTag.get(key);
             if (value == null) {
                 continue;
@@ -130,7 +151,7 @@ public final class HandItemDump {
         Item item = stack.getItem();
         var itemTags = item.builtInRegistryHolder().tags()
                 .map(TagKey::location)
-                .map(Identifier::toString)
+                .map(ResourceLocation::toString)
                 .sorted()
                 .toList();
         if (!itemTags.isEmpty()) {
@@ -158,18 +179,18 @@ public final class HandItemDump {
         return prefix.append(body);
     }
 
-    /** One click copies exactly {@code text} (e.g. a single {@code #namespace:path} tag). */
     private static MutableComponent clickableCopyOnly(String text, ChatFormatting color) {
         return Component.literal(text)
                 .withStyle(Style.EMPTY
                         .withColor(color)
-                        .withClickEvent(new ClickEvent.CopyToClipboard(text))
-                        .withHoverEvent(new HoverEvent.ShowText(Component.literal("Click to copy"))));
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, text))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                Component.translatable("command.iska_utils.debug.click_to_copy"))));
     }
 
     private static void sendCopyableNbt(CommandSourceStack source, String nbtString, ChatFormatting color) {
         nbtString = toChatSingleLine(nbtString);
-        Component copyFeedback = Component.literal("Click to copy");
+        Component copyFeedback = Component.translatable("command.iska_utils.debug.click_to_copy");
         if (nbtString.length() > MAX_CHAT_LENGTH) {
             int chunks = (nbtString.length() + MAX_CHAT_LENGTH - 1) / MAX_CHAT_LENGTH;
             for (int i = 0; i < chunks; i++) {
@@ -183,16 +204,16 @@ public final class HandItemDump {
                 MutableComponent chunkComponent = Component.literal(chunk)
                         .withStyle(Style.EMPTY
                                 .withColor(color)
-                                .withClickEvent(new ClickEvent.CopyToClipboard(chunk))
-                                .withHoverEvent(new HoverEvent.ShowText(copyFeedback)));
+                                .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, chunk))
+                                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, copyFeedback)));
                 source.sendSuccess(() -> chunkLabel.append(chunkComponent), false);
             }
         } else {
             MutableComponent nbtComponent = Component.literal(nbtString)
                     .withStyle(Style.EMPTY
                             .withColor(color)
-                            .withClickEvent(new ClickEvent.CopyToClipboard(nbtString))
-                            .withHoverEvent(new HoverEvent.ShowText(copyFeedback)));
+                            .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, nbtString))
+                            .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, copyFeedback)));
             source.sendSuccess(() -> nbtComponent, false);
         }
     }

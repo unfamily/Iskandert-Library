@@ -1,6 +1,6 @@
 package net.unfamily.iskalib.liquid;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Immutable registration request for one normal liquid in a consumer mod namespace.
@@ -12,8 +12,8 @@ public record LiquidSpec(
         int tintArgb,
         String descriptionId,
         int lightLevel,
-        Identifier stillTexture,
-        Identifier flowingTexture,
+        ResourceLocation stillTexture,
+        ResourceLocation flowingTexture,
         boolean registerBucket
 ) {
     public static final String ISKA_LIB_ID = "iska_lib";
@@ -26,16 +26,16 @@ public record LiquidSpec(
     public static final String LIB_THICK_STILL_PATH = "block/fluid/thick_still";
     public static final String LIB_THICK_FLOW_PATH = "block/fluid/thick_flow";
 
-    public static final Identifier ISKA_LIB_THICK_STILL =
-            Identifier.fromNamespaceAndPath(ISKA_LIB_ID, LIB_THICK_STILL_PATH);
-    public static final Identifier ISKA_LIB_THICK_FLOW =
-            Identifier.fromNamespaceAndPath(ISKA_LIB_ID, LIB_THICK_FLOW_PATH);
+    public static final ResourceLocation ISKA_LIB_THICK_STILL =
+            ResourceLocation.fromNamespaceAndPath(ISKA_LIB_ID, LIB_THICK_STILL_PATH);
+    public static final ResourceLocation ISKA_LIB_THICK_FLOW =
+            ResourceLocation.fromNamespaceAndPath(ISKA_LIB_ID, LIB_THICK_FLOW_PATH);
 
     /** Thin liquid style: vanilla water sprites + tint (Colossal gelid breezium convention). */
-    public static final Identifier VANILLA_THIN_STILL =
-            Identifier.withDefaultNamespace("block/water_still");
-    public static final Identifier VANILLA_THIN_FLOW =
-            Identifier.withDefaultNamespace("block/water_flow");
+    public static final ResourceLocation VANILLA_THIN_STILL =
+            ResourceLocation.withDefaultNamespace("block/water_still");
+    public static final ResourceLocation VANILLA_THIN_FLOW =
+            ResourceLocation.withDefaultNamespace("block/water_flow");
 
     public LiquidSpec(String modId, String name, int tintArgb) {
         this(modId, name, tintArgb, defaultDescriptionId(modId, name), 0, true);
@@ -56,8 +56,8 @@ public record LiquidSpec(
                 tintArgb,
                 descriptionId,
                 lightLevel,
-                Identifier.fromNamespaceAndPath(modId, DEFAULT_STILL_PATH),
-                Identifier.fromNamespaceAndPath(modId, DEFAULT_FLOWING_PATH),
+                ResourceLocation.fromNamespaceAndPath(modId, DEFAULT_STILL_PATH),
+                ResourceLocation.fromNamespaceAndPath(modId, DEFAULT_FLOWING_PATH),
                 registerBucket
         );
     }
@@ -69,8 +69,8 @@ public record LiquidSpec(
                 tintArgb,
                 defaultDescriptionId(modId, name),
                 0,
-                Identifier.fromNamespaceAndPath(modId, stillPath),
-                Identifier.fromNamespaceAndPath(modId, flowingPath),
+                ResourceLocation.fromNamespaceAndPath(modId, stillPath),
+                ResourceLocation.fromNamespaceAndPath(modId, flowingPath),
                 true
         );
     }

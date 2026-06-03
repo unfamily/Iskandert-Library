@@ -1,10 +1,9 @@
 {
   "required": true,
   "package": "net.unfamily.iskalib.mixin",
-  "compatibilityLevel": "JAVA_25",
+  "compatibilityLevel": "JAVA_21",
   "refmap": "iska_lib.refmap.json",
   "mixins": [
-    "CraftingInputMixin",
     "CauldronFluidContentMixin"
   ],
   "minVersion": "0.8"

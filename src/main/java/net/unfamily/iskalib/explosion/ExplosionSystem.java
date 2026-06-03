@@ -527,7 +527,7 @@ public final class ExplosionSystem {
 
             return new ExplosionInfo(
                     number,
-                    level.dimension().identifier().toString(),
+                    level.dimension().location().toString(),
                     center,
                     horizontalRadius,
                     verticalRadius,

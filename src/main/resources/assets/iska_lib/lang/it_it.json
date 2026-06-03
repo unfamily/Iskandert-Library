@@ -14,5 +14,7 @@
   "commands.iska_lib.explosion.info.none": "Nessuna esplosione progressiva attiva.",
   "commands.iska_lib.explosion.info.header": "Esplosioni attive: %s",
   "commands.iska_lib.explosion.info.entry": "[%s] %s @ %s %s %s | raggi %sx%s | %s%% | onda %s/%s | sub-regioni %s/%s | blocchi %s",
-  "commands.iska_lib.explosion.info.active_front": "  Fronte a %s %s %s (sub-regione %s%%)"
+  "commands.iska_lib.explosion.info.active_front": "  Fronte a %s %s %s (sub-regione %s%%)",
+  "message.iska_lib.world_backup_gate.title": "Eseguire un backup del mondo?",
+  "message.iska_lib.world_backup_gate.warning": "Questo mondo potrebbe richiedere un backup prima di continuare con la versione mod %s.\n\nCrea un backup prima di caricare, oppure continua senza backup."
 }

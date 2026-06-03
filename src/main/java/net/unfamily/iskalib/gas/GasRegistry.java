@@ -1,7 +1,7 @@
 package net.unfamily.iskalib.gas;
 
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;
@@ -18,8 +18,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class GasRegistry {
     private static final Map<Block, RegisteredGas> BY_BLOCK = new ConcurrentHashMap<>();
-    private static final Map<Identifier, RegisteredGas> BY_BLOCK_ID = new ConcurrentHashMap<>();
-    private static final Map<Identifier, RegisteredGas> BY_FLUID_ID = new ConcurrentHashMap<>();
+    private static final Map<ResourceLocation, RegisteredGas> BY_BLOCK_ID = new ConcurrentHashMap<>();
+    private static final Map<ResourceLocation, RegisteredGas> BY_FLUID_ID = new ConcurrentHashMap<>();
     private static final List<RegisteredGas> ALL = Collections.synchronizedList(new ArrayList<>());
 
     private GasRegistry() {}
@@ -28,7 +28,7 @@ public final class GasRegistry {
         BY_BLOCK_ID.put(gas.blockId(), gas);
         BY_BLOCK_ID.put(gas.sourceFluidId(), gas);
         BY_FLUID_ID.put(gas.sourceFluidId(), gas);
-        BY_FLUID_ID.put(Identifier.fromNamespaceAndPath(gas.modId(), gas.spec().fluidFlowingId()), gas);
+        BY_FLUID_ID.put(ResourceLocation.fromNamespaceAndPath(gas.modId(), gas.spec().fluidFlowingId()), gas);
         ALL.add(gas);
     }
 
@@ -46,7 +46,7 @@ public final class GasRegistry {
         if (cached != null) {
             return cached;
         }
-        Identifier id = BuiltInRegistries.BLOCK.getKey(block);
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
         return id != null ? BY_BLOCK_ID.get(id) : null;
     }
 
@@ -57,7 +57,7 @@ public final class GasRegistry {
 
     @Nullable
     public static RegisteredGas fromFluid(Fluid fluid) {
-        Identifier id = BuiltInRegistries.FLUID.getKey(fluid);
+        ResourceLocation id = BuiltInRegistries.FLUID.getKey(fluid);
         return id != null ? BY_FLUID_ID.get(id) : null;
     }
 

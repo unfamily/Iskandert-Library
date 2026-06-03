@@ -10,15 +10,15 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.FluidUtil;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.fluids.capability.IFluidHandlerItem;
 import net.neoforged.neoforge.fluids.capability.wrappers.FluidBucketWrapper;
-import net.minecraft.world.phys.BlockHitResult;
-import net.neoforged.neoforge.transfer.fluid.FluidUtil;
-import net.unfamily.iskalib.transfer.LegacyIFluidHandlerResourceHandler;
 
 /**
  * Drain-only pickup for the top of a rising gas fluid column ({@link GasLiquidBlock}).
@@ -31,45 +31,41 @@ public final class GasFluidInteractions {
     public static void onRegisterCapabilities(RegisterCapabilitiesEvent event) {
         GasRegistry.bindBlocks();
         registerGasBucketItemCapabilities(event);
-        for (RegisteredGas gas : IskaLibGases.allRegisteredGases()) {
+        for (RegisteredGas gas : GasRegistry.all()) {
             if (!(gas.block() instanceof GasLiquidBlock)) {
                 continue;
             }
             event.registerBlock(
-                    Capabilities.Fluid.BLOCK,
+                    Capabilities.FluidHandler.BLOCK,
                     (level, pos, state, blockEntity, direction) -> {
                         if (!GasLiquidBlock.isExtractableAt(level, pos, gas)) {
                             return null;
                         }
-                        return LegacyIFluidHandlerResourceHandler.wrap(
-                                new GasBlockFluidHandler(gas, level, pos));
+                        return new GasBlockFluidHandler(gas, level, pos);
                     },
                     gas.block());
         }
     }
 
     /**
-     * NeoForge only auto-registers fluid item capabilities for exact {@link net.minecraft.world.item.BucketItem}
-     * classes, not {@link GasBucketItem} subclasses — required for external tank mods and {@link FluidUtil}.
+     * NeoForge only auto-registers {@link Capabilities.FluidHandler#ITEM} for items whose class is exactly
+     * {@link net.minecraft.world.item.BucketItem}, not {@link GasBucketItem} subclasses — tank mods need this.
      */
     private static void registerGasBucketItemCapabilities(RegisterCapabilitiesEvent event) {
-        for (RegisteredGas gas : IskaLibGases.allRegisteredGases()) {
-            if (!gas.isBucketReady()) {
-                continue;
-            }
+        for (RegisteredGas gas : GasRegistry.all()) {
             Item item = gas.bucketItem();
             if (!(item instanceof GasBucketItem)) {
                 continue;
             }
             event.registerItem(
-                    Capabilities.Fluid.ITEM,
-                    (stack, context) -> LegacyIFluidHandlerResourceHandler.wrap(new FluidBucketWrapper(stack)),
+                    Capabilities.FluidHandler.ITEM,
+                    (stack, context) -> new FluidBucketWrapper(stack),
                     item);
         }
     }
 
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        if (event.getLevel().isClientSide()) {
+        if (event.getLevel().isClientSide) {
             return;
         }
         BlockState state = event.getLevel().getBlockState(event.getPos());
@@ -97,10 +93,11 @@ public final class GasFluidInteractions {
 
     public static boolean tryExtractOnly(Level level, Player player, InteractionHand hand, ItemStack stack,
                                           RegisteredGas gas, BlockPos pos, Direction side) {
-        if (level.isClientSide() || player == null) {
+        if (level.isClientSide || player == null) {
             return false;
         }
-        if (stack.isEmpty() || containsPlaceableGas(stack, gas)) {
+        ItemStack held = player.getItemInHand(hand);
+        if (held.isEmpty() || containsPlaceableGas(held, gas)) {
             return false;
         }
         if (!GasLiquidBlock.isExtractableAt(level, pos, gas)) {
@@ -110,7 +107,65 @@ public final class GasFluidInteractions {
             player.getInventory().setChanged();
             return true;
         }
-        return false;
+        ItemStack single = held.copyWithCount(1);
+        IFluidHandlerItem itemHandler = single.getCapability(Capabilities.FluidHandler.ITEM);
+        if (itemHandler == null) {
+            return false;
+        }
+        GasBlockFluidHandler blockHandler = new GasBlockFluidHandler(gas, level, pos);
+        if (!extractViaItemHandler(level, player, gas, blockHandler, itemHandler)) {
+            return false;
+        }
+        applyExtractedContainer(player, hand, held, itemHandler.getContainer());
+        return true;
+    }
+
+    private static void applyExtractedContainer(Player player, InteractionHand hand, ItemStack stackInHand, ItemStack result) {
+        if (result.isEmpty()) {
+            return;
+        }
+        stackInHand.shrink(1);
+        if (stackInHand.isEmpty()) {
+            player.setItemInHand(hand, result);
+        } else {
+            player.setItemInHand(hand, stackInHand);
+            if (!player.getInventory().add(result)) {
+                player.drop(result, false);
+            }
+        }
+        player.getInventory().setChanged();
+    }
+
+    private static boolean containsPlaceableGas(ItemStack stack, RegisteredGas gas) {
+        return FluidUtil.getFluidContained(stack)
+                .filter(fluid -> !fluid.isEmpty() && fluid.getFluid().isSame(gas.sourceFluid()))
+                .isPresent();
+    }
+
+    private static boolean extractViaItemHandler(Level level, Player player, RegisteredGas gas,
+                                                 GasBlockFluidHandler blockHandler, IFluidHandlerItem itemHandler) {
+        if (itemHandler.getTanks() == 0) {
+            return false;
+        }
+        if (!itemHandler.getFluidInTank(0).isEmpty()) {
+            return false;
+        }
+        FluidStack available = blockHandler.drain(BUCKET_VOLUME, IFluidHandler.FluidAction.SIMULATE);
+        if (available.isEmpty()) {
+            return false;
+        }
+        FluidStack toMove = available.copy();
+        toMove.setAmount(Math.min(available.getAmount(), itemHandler.getTankCapacity(0)));
+        if (!itemHandler.isFluidValid(0, toMove)) {
+            return false;
+        }
+        int filled = itemHandler.fill(toMove, IFluidHandler.FluidAction.EXECUTE);
+        if (filled <= 0) {
+            return false;
+        }
+        blockHandler.drain(filled, IFluidHandler.FluidAction.EXECUTE);
+        player.getInventory().setChanged();
+        return true;
     }
 
     public static InteractionResult useItemOnCollectableGas(
@@ -141,7 +196,7 @@ public final class GasFluidInteractions {
         if (stack.isEmpty() || containsPlaceableGas(stack, gas)) {
             return InteractionResult.PASS;
         }
-        if (level.isClientSide()) {
+        if (level.isClientSide) {
             return InteractionResult.SUCCESS;
         }
         Direction face = side != null ? side : Direction.UP;
@@ -150,12 +205,7 @@ public final class GasFluidInteractions {
                 : InteractionResult.FAIL;
     }
 
-    private static boolean containsPlaceableGas(ItemStack stack, RegisteredGas gas) {
-        FluidStack contained = FluidUtil.getFirstStackContained(stack);
-        return !contained.isEmpty() && contained.is(gas.sourceFluid());
-    }
-
-    static void removeGasBlock(Level level, BlockPos pos) {
+    private static void removeGasBlock(Level level, BlockPos pos) {
         GasLiquidBlock.removeGasAt(level, pos);
     }
 

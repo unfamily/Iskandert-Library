@@ -4,6 +4,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.unfamily.iskalib.IskaLib;
+import net.unfamily.iskalib.stage.StageCommand;
 
 /**
  * Auto-registers library commands when the library is present as a standalone mod.

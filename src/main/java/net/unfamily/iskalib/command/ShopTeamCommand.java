@@ -11,8 +11,8 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permission;
-import net.minecraft.server.permissions.PermissionLevel;
+
+
 import net.unfamily.iskalib.team.ShopTeamManager;
 
 import java.util.Collection;
@@ -33,39 +33,39 @@ public final class ShopTeamCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("iska_lib_team")
-                .requires(source -> source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(0))))
+                .requires(source -> source.hasPermission(0))
                 .then(Commands.literal("create")
                         .then(Commands.argument("teamName", StringArgumentType.word())
                                 .executes(ShopTeamCommand::createTeam)))
                 .then(Commands.literal("delete")
                         .executes(ShopTeamCommand::deleteOwnTeam)
                         .then(Commands.argument("teamName", StringArgumentType.word())
-                                .requires(source -> source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(2))))
+                                .requires(source -> source.hasPermission(2))
                                 .executes(ShopTeamCommand::deleteTeam)))
                 .then(Commands.literal("rename")
                         .then(Commands.argument("newName", StringArgumentType.word())
                                 .executes(ShopTeamCommand::renameOwnTeam)
                                 .then(Commands.argument("teamName", StringArgumentType.word())
-                                        .requires(source -> source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(2))))
+                                        .requires(source -> source.hasPermission(2))
                                         .executes(ShopTeamCommand::renameTeam))))
                 .then(Commands.literal("leader")
                         .then(Commands.argument("newLeader", EntityArgument.players())
                                 .executes(ShopTeamCommand::transferOwnTeamLeadership)
                                 .then(Commands.argument("teamName", StringArgumentType.word())
-                                        .requires(source -> source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(2))))
+                                        .requires(source -> source.hasPermission(2))
                                         .executes(ShopTeamCommand::transferTeamLeadership))))
                 .then(Commands.literal("assistant")
                         .then(Commands.literal("add")
                                 .then(Commands.argument("player", EntityArgument.players())
                                         .executes(ShopTeamCommand::addAssistantToOwnTeam)
                                         .then(Commands.argument("teamName", StringArgumentType.word())
-                                                .requires(source -> source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(2))))
+                                                .requires(source -> source.hasPermission(2))
                                                 .executes(ShopTeamCommand::addTeamAssistant))))
                         .then(Commands.literal("remove")
                                 .then(Commands.argument("player", EntityArgument.players())
                                         .executes(ShopTeamCommand::removeAssistantFromOwnTeam)
                                         .then(Commands.argument("teamName", StringArgumentType.word())
-                                                .requires(source -> source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(2))))
+                                                .requires(source -> source.hasPermission(2))
                                                 .executes(ShopTeamCommand::removeTeamAssistant)))))
                 .then(Commands.literal("assistant_list")
                         .executes(ShopTeamCommand::listOwnAssistants)
@@ -75,13 +75,13 @@ public final class ShopTeamCommand {
                         .then(Commands.argument("player", EntityArgument.players())
                                 .executes(ShopTeamCommand::inviteToOwnTeam)
                                 .then(Commands.argument("teamName", StringArgumentType.word())
-                                        .requires(source -> source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(2))))
+                                        .requires(source -> source.hasPermission(2))
                                         .executes(ShopTeamCommand::inviteToTeam))))
                 .then(Commands.literal("cancelInvite")
                         .then(Commands.argument("player", EntityArgument.players())
                                 .executes(ShopTeamCommand::cancelInviteFromOwnTeam)
                                 .then(Commands.argument("teamName", StringArgumentType.word())
-                                        .requires(source -> source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(2))))
+                                        .requires(source -> source.hasPermission(2))
                                         .executes(ShopTeamCommand::cancelInviteFromTeam))))
                 .then(Commands.literal("accept")
                         .then(Commands.argument("teamName", StringArgumentType.word())

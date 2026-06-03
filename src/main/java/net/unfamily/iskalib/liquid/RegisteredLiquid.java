@@ -1,9 +1,10 @@
 package net.unfamily.iskalib.liquid;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
+import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 
@@ -17,25 +18,28 @@ public final class RegisteredLiquid {
     private final DeferredHolder<Fluid, ? extends Fluid> sourceFluid;
     private final DeferredHolder<Fluid, ? extends Fluid> flowingFluid;
     private final DeferredBlock<? extends Block> block;
+    private final DeferredHolder<FluidType, FluidType> fluidType;
     private final Supplier<DeferredHolder<Item, ? extends Item>> bucketItem;
-    private final Identifier sourceFluidId;
-    private final Identifier blockId;
-    private final Identifier bucketId;
+    private final ResourceLocation sourceFluidId;
+    private final ResourceLocation blockId;
+    private final ResourceLocation bucketId;
 
     public RegisteredLiquid(
             LiquidSpec spec,
             DeferredHolder<Fluid, ? extends Fluid> sourceFluid,
             DeferredHolder<Fluid, ? extends Fluid> flowingFluid,
             DeferredBlock<? extends Block> block,
+            DeferredHolder<FluidType, FluidType> fluidType,
             Supplier<DeferredHolder<Item, ? extends Item>> bucketItem,
-            Identifier sourceFluidId,
-            Identifier blockId,
-            Identifier bucketId
+            ResourceLocation sourceFluidId,
+            ResourceLocation blockId,
+            ResourceLocation bucketId
     ) {
         this.spec = spec;
         this.sourceFluid = sourceFluid;
         this.flowingFluid = flowingFluid;
         this.block = block;
+        this.fluidType = fluidType;
         this.bucketItem = bucketItem;
         this.sourceFluidId = sourceFluidId;
         this.blockId = blockId;
@@ -44,6 +48,14 @@ public final class RegisteredLiquid {
 
     public LiquidSpec spec() {
         return spec;
+    }
+
+    public int tintArgb() {
+        return spec.tintArgb();
+    }
+
+    public DeferredHolder<FluidType, FluidType> fluidTypeHolder() {
+        return fluidType;
     }
 
     public DeferredHolder<Fluid, ? extends Fluid> sourceHolder() {
@@ -96,15 +108,15 @@ public final class RegisteredLiquid {
         return holder.get();
     }
 
-    public Identifier sourceFluidId() {
+    public ResourceLocation sourceFluidId() {
         return sourceFluidId;
     }
 
-    public Identifier blockId() {
+    public ResourceLocation blockId() {
         return blockId;
     }
 
-    public Identifier bucketId() {
+    public ResourceLocation bucketId() {
         return bucketId;
     }
 }

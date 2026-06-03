@@ -1,6 +1,6 @@
 package net.unfamily.iskalib.gas;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
@@ -21,13 +21,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Public API: consumer mods register gases on their mod event bus (NeoForge 26.1.2+ only).
+ * Public API: consumer mods register gases on their mod event bus.
  * <p>
  * Pass the consumer's existing {@link DeferredRegister} instances via {@link GasRegistrationRegisters}
  * so blocks/items/fluids share one registrar per namespace. Do not create a second {@code DeferredRegister}
  * for the same mod id.
- * <p>
- * Not for Minecraft 1.21.1 — consumers on older lines must ship an in-mod gas copy (see Colossal Reactors 1.21.1).
  */
 public final class IskaLibGases {
     private static final Map<String, ModGasRegistration> BY_MOD = new ConcurrentHashMap<>();
@@ -45,8 +43,8 @@ public final class IskaLibGases {
         if (!isPhysicalClient() || !CLIENT_HOOKED.add(modEventBus)) {
             return;
         }
-        modEventBus.addListener(net.unfamily.iskalib.client.gas.IskaLibGasFluidModels::registerFluidModels);
-        modEventBus.addListener(net.unfamily.iskalib.client.gas.IskaLibGasBlockModels::registerBlockTintSources);
+        modEventBus.addListener(net.unfamily.iskalib.client.IskaLibFluidClient::registerClientExtensions);
+        modEventBus.addListener(net.unfamily.iskalib.client.IskaLibFluidClient::registerBlockColors);
     }
 
     private static boolean isPhysicalClient() {
@@ -151,28 +149,32 @@ public final class IskaLibGases {
             refs.source = fluids.register(spec.fluidSourceId(), () -> new GasFlowingFluid.Source(fluidProps));
             refs.flowing = fluids.register(spec.fluidFlowingId(), () -> new GasFlowingFluid.Flowing(fluidProps));
 
-            Identifier sourceFluidId = Identifier.fromNamespaceAndPath(modId, spec.fluidSourceId());
-            Identifier blockId = Identifier.fromNamespaceAndPath(modId, spec.blockId());
-            Identifier bucketId = Identifier.fromNamespaceAndPath(modId, spec.bucketId());
+            ResourceLocation sourceFluidId = ResourceLocation.fromNamespaceAndPath(modId, spec.fluidSourceId());
+            ResourceLocation blockId = ResourceLocation.fromNamespaceAndPath(modId, spec.blockId());
+            ResourceLocation bucketId = ResourceLocation.fromNamespaceAndPath(modId, spec.bucketId());
 
-            refs.block = blocks.registerBlock(spec.blockId(),
-                    props -> new GasLiquidBlock(refs.source.get(), props, gasRef::get, spec.tickInterval()),
-                    props -> GasLiquidBlock.configureProperties(props, spec.lightLevel()));
+            refs.block = blocks.register(spec.blockId(), () -> new GasLiquidBlock(
+                    refs.source.get(),
+                    GasLiquidBlock.configureProperties(spec.lightLevel()),
+                    gasRef::get,
+                    spec.tickInterval()));
 
             RegisteredGas gas = new RegisteredGas(
                     spec,
                     refs.source,
                     refs.flowing,
                     refs.block,
+                    refs.fluidType,
                     () -> refs.bucket,
                     sourceFluidId,
                     blockId,
                     bucketId);
             gasRef.set(gas);
 
-            refs.bucket = items.registerItem(spec.bucketId(),
-                    props -> new GasBucketItem(props, gasRef.get(), refs.source),
-                    () -> new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1));
+            refs.bucket = items.register(spec.bucketId(), () -> new GasBucketItem(
+                    new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1),
+                    gasRef.get(),
+                    refs.source));
 
             registered.add(gas);
             GasRegistry.register(gas);

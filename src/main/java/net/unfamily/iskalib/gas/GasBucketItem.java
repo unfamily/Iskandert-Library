@@ -1,10 +1,8 @@
 package net.unfamily.iskalib.gas;
 
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BucketItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
@@ -18,23 +16,13 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 public class GasBucketItem extends BucketItem {
     private final RegisteredGas gas;
 
-    /** {@code properties} must come from {@link net.neoforged.neoforge.registries.DeferredRegister.Items#registerItem}. */
-    public GasBucketItem(Item.Properties properties, RegisteredGas gas, DeferredHolder<Fluid, ? extends Fluid> sourceFluid) {
+    public GasBucketItem(Properties properties, RegisteredGas gas, DeferredHolder<Fluid, ? extends Fluid> sourceFluid) {
         super(sourceFluid.get(), properties);
         this.gas = gas;
     }
 
-    public RegisteredGas registeredGas() {
-        return gas;
-    }
-
     public static ItemStack createFilledBucket(RegisteredGas gas) {
         return new ItemStack(gas.bucketItem());
-    }
-
-    @Override
-    public InteractionResult use(Level level, Player player, InteractionHand hand) {
-        return super.use(level, player, hand);
     }
 
     @Override

@@ -18,8 +18,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permission;
-import net.minecraft.server.permissions.PermissionLevel;
+
+
 import net.unfamily.iskalib.explosion.ExplosionInfo;
 import net.unfamily.iskalib.explosion.ExplosionSystem;
 import org.slf4j.Logger;
@@ -38,8 +38,7 @@ public final class ExplosionCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("iska_lib_explosion")
-                        .requires(source -> source.permissions().hasPermission(
-                                new Permission.HasCommandLevel(PermissionLevel.byId(2))))
+                        .requires(source -> source.hasPermission(2))
                         .then(Commands.literal("start")
                                 .then(Commands.argument("horizontal_radius", IntegerArgumentType.integer(1))
                                         .then(Commands.argument("vertical_radius", IntegerArgumentType.integer(1, 1000))
