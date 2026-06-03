@@ -1,46 +1,41 @@
 package net.unfamily.iskalib.client.migration;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.ConfirmScreen;
+import net.minecraft.client.gui.screens.BackupConfirmScreen;
+import net.minecraft.client.gui.screens.worldselection.EditWorldScreen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.minecraft.world.level.storage.LevelStorageSource;
 import net.unfamily.iskalib.migration.worldbackup.WorldBackupGate;
 import net.unfamily.iskalib.migration.worldbackup.WorldBackupGateConfig;
-import net.unfamily.iskalib.migration.worldbackup.packet.WorldBackupResponseC2SPacket;
+import net.unfamily.iskalib.migration.worldbackup.WorldBackupGateStorage;
+
+import java.nio.file.Path;
 
 /**
- * Client UI for {@link net.unfamily.iskalib.migration.worldbackup.WorldBackupGate} (vanilla-style confirm screen).
+ * Pre-world-load backup UI using vanilla {@link BackupConfirmScreen} (backup yes / continue without).
  */
 public final class WorldBackupGateClient {
-    private static boolean promptVisible;
-
     private WorldBackupGateClient() {
     }
 
-    public static boolean isPromptVisible() {
-        return promptVisible;
-    }
-
-    public static void openPromptScreen(String registryKey) {
-        WorldBackupGateConfig config = WorldBackupGate.getConfig(registryKey);
-        if (config == null) {
-            return;
-        }
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null) {
-            return;
-        }
-        promptVisible = true;
-        minecraft.setScreen(new ConfirmScreen(
-                confirmed -> {
-                    promptVisible = false;
-                    minecraft.setScreen(null);
-                    ClientPacketDistributor.sendToServer(new WorldBackupResponseC2SPacket(registryKey, confirmed));
+    public static void showPreWorldLoadBackupScreen(
+            Minecraft minecraft,
+            LevelStorageSource.LevelStorageAccess access,
+            WorldBackupGateConfig config,
+            Runnable onProceed,
+            Runnable onCancel) {
+        Path dataDir = WorldBackupGateStorage.worldDataDir(access);
+        minecraft.setScreen(new BackupConfirmScreen(
+                onCancel,
+                (makeBackup, ignored) -> {
+                    WorldBackupGate.acknowledgeOnDisk(dataDir, config);
+                    if (makeBackup) {
+                        EditWorldScreen.makeBackupAndShowToast(access);
+                    }
+                    onProceed.run();
                 },
                 Component.translatable(config.titleKey()),
                 Component.translatable(config.warningKey(), config.migrationVersionLabel()),
-                Component.translatable(config.confirmKey()),
-                Component.translatable(config.cancelKey())
-        ));
+                false));
     }
 }

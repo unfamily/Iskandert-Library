@@ -16,9 +16,6 @@
   "commands.iska_lib.explosion.info.header": "Active explosions: %s",
   "commands.iska_lib.explosion.info.entry": "[%s] %s @ %s %s %s | radii %sx%s | %s%% | wave %s/%s | sub-regions %s/%s | blocks %s",
   "commands.iska_lib.explosion.info.active_front": "  Front at %s %s %s (sub-region %s%%)",
-  "message.iska_lib.world_backup_gate.title": "Back up this world",
-  "message.iska_lib.world_backup_gate.warning": "This world may need a backup before continuing with mod version %s.\n\nMake a full backup of your world folder before continuing.",
-  "message.iska_lib.world_backup_gate.confirm": "I have backed up; continue",
-  "message.iska_lib.world_backup_gate.cancel": "Leave world",
-  "message.iska_lib.world_backup_gate.declined": "You must back up your world before continuing."
+  "message.iska_lib.world_backup_gate.title": "Back up this world?",
+  "message.iska_lib.world_backup_gate.warning": "This world may need a backup before continuing with mod version %s.\n\nCreate a backup before loading, or continue without one."
 }
