@@ -133,6 +133,7 @@ public class StructureLoader {
             }
 
         } catch (Exception e) {
+            LOGGER.warn("Failed to reload structure definitions: {}", e.toString());
         }
     }
 
@@ -194,6 +195,7 @@ public class StructureLoader {
             }
             
         } catch (Exception e) {
+            LOGGER.warn("Failed to scan client structures under {}: {}", clientStructuresPath, e.toString());
         }
     }
     
