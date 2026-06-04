@@ -67,8 +67,7 @@ public final class WorldBackupGateStorage {
                     modVersion,
                     StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE,
-                    StandardOpenOption.TRUNCATE_EXISTING,
-                    StandardOpenOption.SYNC);
+                    StandardOpenOption.TRUNCATE_EXISTING);
             writeGateFileEntry(dataDir, config, modVersion);
             writeLegacyAck(dataDir, config);
         } catch (IOException e) {
