@@ -112,6 +112,19 @@ public class MarkRenderer {
         }
     }
 
+    public void removeBillboardMarkerForOwner(BlockPos owner, BlockPos pos) {
+        if (owner == null || pos == null) {
+            return;
+        }
+        Map<BlockPos, MarkBlockData> worldMarkers = billboardMarkersByOwner.get(owner.immutable());
+        if (worldMarkers != null) {
+            worldMarkers.remove(pos.immutable());
+            if (worldMarkers.isEmpty()) {
+                billboardMarkersByOwner.remove(owner.immutable());
+            }
+        }
+    }
+
     public void addBillboardMarker(BlockPos owner, BlockPos pos, int color, int durationTicks) {
         if (owner == null || owner.equals(BlockPos.ZERO)) {
             addBillboardMarker(pos, color, durationTicks);

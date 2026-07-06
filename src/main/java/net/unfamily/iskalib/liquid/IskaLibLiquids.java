@@ -1,16 +1,11 @@
 package net.unfamily.iskalib.liquid;
 
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.LiquidBlock;
-import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.MapColor;
-import net.minecraft.world.level.material.PushReaction;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.neoforge.common.SoundActions;
 import net.neoforged.neoforge.fluids.BaseFlowingFluid;
 import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.registries.DeferredBlock;
@@ -30,7 +25,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class IskaLibLiquids {
     private static final Map<String, ModLiquidRegistration> BY_MOD = new ConcurrentHashMap<>();
-    private static final java.util.Set<IEventBus> CLIENT_HOOKED = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private IskaLibLiquids() {}
 
@@ -39,19 +33,7 @@ public final class IskaLibLiquids {
     }
 
     private static void hookClientEventsOnce(IEventBus modEventBus) {
-        if (!isPhysicalClient() || !CLIENT_HOOKED.add(modEventBus)) {
-            return;
-        }
-        modEventBus.addListener(net.unfamily.iskalib.client.IskaLibFluidClient::registerClientExtensions);
-    }
-
-    private static boolean isPhysicalClient() {
-        try {
-            Class.forName("net.minecraft.client.Minecraft");
-            return true;
-        } catch (Throwable ignored) {
-            return false;
-        }
+        net.unfamily.iskalib.client.IskaLibFluidClient.hookConsumerModClientOnce(modEventBus);
     }
 
     /**
@@ -122,15 +104,8 @@ public final class IskaLibLiquids {
                 DeferredHolder<Item, net.minecraft.world.item.BucketItem> bucket;
             };
 
-            refs.fluidType = fluidTypes.register(spec.fluidSourceId() + "_type", () -> new FluidType(FluidType.Properties.create()
-                    .descriptionId(spec.descriptionId())
-                    .lightLevel(spec.lightLevel())
-                    .density(1000)
-                    .viscosity(1000)
-                    .temperature(300)
-                    .canConvertToSource(false)
-                    .sound(SoundActions.BUCKET_FILL, SoundEvents.BUCKET_FILL)
-                    .sound(SoundActions.BUCKET_EMPTY, SoundEvents.BUCKET_EMPTY)));
+            refs.fluidType = fluidTypes.register(spec.fluidSourceId() + "_type", () -> new FluidType(
+                    spec.typeProperties().build(spec.descriptionId(), spec.lightLevel(), spec.sounds())));
 
             BaseFlowingFluid.Properties fluidProps = new BaseFlowingFluid.Properties(
                     refs.fluidType,
@@ -138,6 +113,7 @@ public final class IskaLibLiquids {
                     () -> refs.flowing.get())
                     .block(() -> refs.block.get())
                     .bucket(() -> spec.registerBucket() && refs.bucket.isBound() ? refs.bucket.get() : null);
+            spec.flowProperties().applyTo(fluidProps);
 
             refs.source = fluids.register(spec.fluidSourceId(), () -> new BaseFlowingFluid.Source(fluidProps));
             refs.flowing = fluids.register(spec.fluidFlowingId(), () -> new BaseFlowingFluid.Flowing(fluidProps));
@@ -146,16 +122,9 @@ public final class IskaLibLiquids {
             ResourceLocation blockId = ResourceLocation.fromNamespaceAndPath(modId, spec.blockId());
             ResourceLocation bucketId = ResourceLocation.fromNamespaceAndPath(modId, spec.bucketId());
 
-            refs.block = blocks.register(spec.blockId(), () -> new LiquidBlock(
+            refs.block = blocks.register(spec.blockId(), () -> spec.blockProperties().createBlock(
                     refs.flowing.get(),
-                    BlockBehaviour.Properties.of()
-                            .mapColor(MapColor.COLOR_GRAY)
-                            .replaceable()
-                            .strength(100.0F)
-                            .pushReaction(PushReaction.DESTROY)
-                            .noLootTable()
-                            .liquid()
-                            .lightLevel(state -> spec.lightLevel())));
+                    spec.blockProperties().toBlockProperties(spec.lightLevel())));
 
             if (spec.registerBucket()) {
                 refs.bucket = items.register(spec.bucketId(), () -> new net.minecraft.world.item.BucketItem(

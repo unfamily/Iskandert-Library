@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.material.FluidState;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
@@ -20,7 +21,27 @@ public final class IskaLibFluidClient {
     private static final ResourceLocation GAS_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(IskaLib.MOD_ID, "block/gas");
 
+    private static final java.util.Set<IEventBus> CONSUMER_HOOKED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     private IskaLibFluidClient() {}
+
+    /** Registers client hooks once per consumer mod bus (shared by liquids and gases). */
+    public static void hookConsumerModClientOnce(IEventBus modEventBus) {
+        if (!isPhysicalClient() || !CONSUMER_HOOKED.add(modEventBus)) {
+            return;
+        }
+        modEventBus.addListener(IskaLibFluidClient::registerClientExtensions);
+        modEventBus.addListener(IskaLibFluidClient::registerBlockColors);
+    }
+
+    private static boolean isPhysicalClient() {
+        try {
+            Class.forName("net.minecraft.client.Minecraft");
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
 
     public static void registerClientExtensions(RegisterClientExtensionsEvent event) {
         for (RegisteredGas gas : GasRegistry.all()) {
@@ -57,6 +78,7 @@ public final class IskaLibFluidClient {
             }
             ResourceLocation still = liquid.spec().stillTexture();
             ResourceLocation flow = liquid.spec().flowingTexture();
+            ResourceLocation overlay = liquid.spec().clientProperties().overlayTexture();
             int tint = liquid.tintArgb();
             event.registerFluidType(new IClientFluidTypeExtensions() {
                 @Override
@@ -67,6 +89,11 @@ public final class IskaLibFluidClient {
                 @Override
                 public ResourceLocation getFlowingTexture() {
                     return flow;
+                }
+
+                @Override
+                public ResourceLocation getOverlayTexture() {
+                    return overlay;
                 }
 
                 @Override
@@ -89,6 +116,13 @@ public final class IskaLibFluidClient {
             }
             int tint = gas.tintArgb();
             event.register((state, level, pos, index) -> tint, gas.block());
+        }
+        for (RegisteredLiquid liquid : IskaLibLiquids.allRegisteredLiquids()) {
+            if (!liquid.blockHolder().isBound()) {
+                continue;
+            }
+            int tint = liquid.tintArgb();
+            event.register((state, level, pos, index) -> tint, liquid.block());
         }
     }
 }

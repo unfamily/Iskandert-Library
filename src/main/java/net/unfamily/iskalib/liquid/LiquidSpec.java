@@ -14,7 +14,12 @@ public record LiquidSpec(
         int lightLevel,
         ResourceLocation stillTexture,
         ResourceLocation flowingTexture,
-        boolean registerBucket
+        boolean registerBucket,
+        LiquidTypeProperties typeProperties,
+        FlowingFluidProperties flowProperties,
+        LiquidBlockProperties blockProperties,
+        LiquidClientProperties clientProperties,
+        LiquidSoundSet sounds
 ) {
     public static final String ISKA_LIB_ID = "iska_lib";
 
@@ -75,6 +80,26 @@ public record LiquidSpec(
         );
     }
 
+    public LiquidSpec(
+            String modId,
+            String name,
+            int tintArgb,
+            String descriptionId,
+            int lightLevel,
+            ResourceLocation stillTexture,
+            ResourceLocation flowingTexture,
+            boolean registerBucket
+    ) {
+        this(
+                modId, name, tintArgb, descriptionId, lightLevel, stillTexture, flowingTexture, registerBucket,
+                LiquidTypeProperties.DEFAULT,
+                FlowingFluidProperties.DEFAULT,
+                LiquidBlockProperties.STANDARD,
+                LiquidClientProperties.NONE,
+                LiquidSoundSet.DEFAULT
+        );
+    }
+
     public static String defaultDescriptionId(String modId, String name) {
         return "fluid." + modId + "." + name;
     }
@@ -101,6 +126,51 @@ public record LiquidSpec(
         return new LiquidSpec(
                 modId, name, tintArgb, descriptionId, lightLevel,
                 VANILLA_THIN_STILL, VANILLA_THIN_FLOW, registerBucket);
+    }
+
+    public LiquidSpec withTypeProperties(LiquidTypeProperties typeProperties) {
+        return new LiquidSpec(modId, name, tintArgb, descriptionId, lightLevel, stillTexture, flowingTexture,
+                registerBucket, typeProperties, flowProperties, blockProperties, clientProperties, sounds);
+    }
+
+    public LiquidSpec withFlowProperties(FlowingFluidProperties flowProperties) {
+        return new LiquidSpec(modId, name, tintArgb, descriptionId, lightLevel, stillTexture, flowingTexture,
+                registerBucket, typeProperties, flowProperties, blockProperties, clientProperties, sounds);
+    }
+
+    public LiquidSpec withBlockProperties(LiquidBlockProperties blockProperties) {
+        return new LiquidSpec(modId, name, tintArgb, descriptionId, lightLevel, stillTexture, flowingTexture,
+                registerBucket, typeProperties, flowProperties, blockProperties, clientProperties, sounds);
+    }
+
+    public LiquidSpec withClientProperties(LiquidClientProperties clientProperties) {
+        return new LiquidSpec(modId, name, tintArgb, descriptionId, lightLevel, stillTexture, flowingTexture,
+                registerBucket, typeProperties, flowProperties, blockProperties, clientProperties, sounds);
+    }
+
+    public LiquidSpec withOverlay(ResourceLocation overlayTexture) {
+        return withClientProperties(LiquidClientProperties.withOverlay(overlayTexture));
+    }
+
+    public LiquidSpec withSounds(LiquidSoundSet sounds) {
+        return new LiquidSpec(modId, name, tintArgb, descriptionId, lightLevel, stillTexture, flowingTexture,
+                registerBucket, typeProperties, flowProperties, blockProperties, clientProperties, sounds);
+    }
+
+    public LiquidSpec withMoltenType() {
+        return withTypeProperties(LiquidTypeProperties.MOLTEN);
+    }
+
+    public LiquidSpec withColdWaterType() {
+        return withTypeProperties(LiquidTypeProperties.COLD_WATER_LIKE);
+    }
+
+    public LiquidSpec withBlockFactory(LiquidBlockFactory factory) {
+        return withBlockProperties(blockProperties.withBlockFactory(factory));
+    }
+
+    public LiquidSpec withBlockLightLevel(int blockLightLevel) {
+        return withBlockProperties(blockProperties.withBlockLightLevel(blockLightLevel));
     }
 
     /** Source fluid registry name (same as {@link #name()} when using base-name ids). */
