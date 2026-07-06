@@ -1,13 +1,11 @@
 package net.unfamily.iskalib.gas;
 
 import net.minecraft.resources.Identifier;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.material.Fluid;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.common.SoundActions;
 import net.neoforged.neoforge.fluids.BaseFlowingFluid;
 import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.registries.DeferredBlock;
@@ -31,7 +29,6 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public final class IskaLibGases {
     private static final Map<String, ModGasRegistration> BY_MOD = new ConcurrentHashMap<>();
-    private static final java.util.Set<IEventBus> CLIENT_HOOKED = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static boolean interactionsInitialized;
 
     private IskaLibGases() {}
@@ -42,11 +39,7 @@ public final class IskaLibGases {
     }
 
     private static void hookClientEventsOnce(IEventBus modEventBus) {
-        if (!isPhysicalClient() || !CLIENT_HOOKED.add(modEventBus)) {
-            return;
-        }
-        modEventBus.addListener(net.unfamily.iskalib.client.gas.IskaLibGasFluidModels::registerFluidModels);
-        modEventBus.addListener(net.unfamily.iskalib.client.gas.IskaLibGasBlockModels::registerBlockTintSources);
+        net.unfamily.iskalib.client.IskaLibConsumerClientHooks.hookConsumerModClientOnce(modEventBus);
     }
 
     private static boolean isPhysicalClient() {
@@ -122,18 +115,8 @@ public final class IskaLibGases {
                 DeferredHolder<Item, GasBucketItem> bucket;
             };
 
-            refs.fluidType = fluidTypes.register(spec.fluidSourceId() + "_type", () -> new FluidType(FluidType.Properties.create()
-                    .descriptionId(spec.descriptionId())
-                    .lightLevel(spec.lightLevel())
-                    .density(-1000)
-                    .viscosity(100)
-                    .temperature(300)
-                    .canDrown(false)
-                    .canSwim(false)
-                    .canPushEntity(false)
-                    .canConvertToSource(false)
-                    .sound(SoundActions.BUCKET_FILL, SoundEvents.BUCKET_FILL)
-                    .sound(SoundActions.BUCKET_EMPTY, SoundEvents.BUCKET_EMPTY)));
+            refs.fluidType = fluidTypes.register(spec.fluidSourceId() + "_type", () -> new FluidType(
+                    spec.typeProperties().build(spec.descriptionId(), spec.lightLevel(), spec.sounds())));
 
             AtomicReference<RegisteredGas> gasRef = new AtomicReference<>();
 
@@ -143,10 +126,8 @@ public final class IskaLibGases {
                     () -> refs.source.get(),
                     () -> refs.flowing.get())
                     .block(() -> refs.block.get())
-                    .bucket(() -> refs.bucket.isBound() ? refs.bucket.get() : null)
-                    .tickRate(Integer.MAX_VALUE / 4)
-                    .slopeFindDistance(0)
-                    .levelDecreasePerBlock(Integer.MAX_VALUE / 4);
+                    .bucket(() -> refs.bucket.isBound() ? refs.bucket.get() : null);
+            spec.flowProperties().applyTo(fluidProps);
 
             refs.source = fluids.register(spec.fluidSourceId(), () -> new GasFlowingFluid.Source(fluidProps));
             refs.flowing = fluids.register(spec.fluidFlowingId(), () -> new GasFlowingFluid.Flowing(fluidProps));
@@ -164,6 +145,7 @@ public final class IskaLibGases {
                     refs.source,
                     refs.flowing,
                     refs.block,
+                    refs.fluidType,
                     () -> refs.bucket,
                     sourceFluidId,
                     blockId,

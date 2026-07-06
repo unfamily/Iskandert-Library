@@ -17,8 +17,10 @@ public final class IskaLibLiquidFluidModels {
             int tint = liquid.spec().tintArgb();
             Material still = new Material(liquid.spec().stillTexture());
             Material flowing = new Material(liquid.spec().flowingTexture());
+            Identifier overlayId = liquid.spec().clientProperties().overlayTexture();
+            Material overlay = overlayId != null ? new Material(overlayId) : null;
             FluidModel.Unbaked model = new FluidModel.Unbaked(
-                    still, flowing, null, FluidTintSources.constant(tint), null);
+                    still, flowing, overlay, FluidTintSources.constant(tint), null);
             event.register(model, liquid::sourceFluid, liquid::flowingFluid);
         }
     }

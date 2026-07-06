@@ -4,6 +4,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
+import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.registries.DeferredHolder;
 
 import java.util.function.Supplier;
@@ -16,6 +17,7 @@ public final class RegisteredGas {
     private final DeferredHolder<Fluid, ? extends Fluid> sourceFluid;
     private final DeferredHolder<Fluid, ? extends Fluid> flowingFluid;
     private final DeferredHolder<Block, ? extends Block> block;
+    private final DeferredHolder<FluidType, FluidType> fluidType;
     private final Supplier<DeferredHolder<Item, ? extends Item>> bucketItem;
     private final Identifier sourceFluidId;
     private final Identifier blockId;
@@ -26,6 +28,7 @@ public final class RegisteredGas {
             DeferredHolder<Fluid, ? extends Fluid> sourceFluid,
             DeferredHolder<Fluid, ? extends Fluid> flowingFluid,
             DeferredHolder<Block, ? extends Block> block,
+            DeferredHolder<FluidType, FluidType> fluidType,
             Supplier<DeferredHolder<Item, ? extends Item>> bucketItem,
             Identifier sourceFluidId,
             Identifier blockId,
@@ -35,6 +38,7 @@ public final class RegisteredGas {
         this.sourceFluid = sourceFluid;
         this.flowingFluid = flowingFluid;
         this.block = block;
+        this.fluidType = fluidType;
         this.bucketItem = bucketItem;
         this.sourceFluidId = sourceFluidId;
         this.blockId = blockId;
@@ -67,6 +71,10 @@ public final class RegisteredGas {
 
     public DeferredHolder<Block, ? extends Block> blockHolder() {
         return block;
+    }
+
+    public DeferredHolder<FluidType, FluidType> fluidTypeHolder() {
+        return fluidType;
     }
 
     public Block block() {

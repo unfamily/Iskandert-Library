@@ -4,6 +4,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
+import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 
@@ -17,6 +18,7 @@ public final class RegisteredLiquid {
     private final DeferredHolder<Fluid, ? extends Fluid> sourceFluid;
     private final DeferredHolder<Fluid, ? extends Fluid> flowingFluid;
     private final DeferredBlock<? extends Block> block;
+    private final DeferredHolder<FluidType, FluidType> fluidType;
     private final Supplier<DeferredHolder<Item, ? extends Item>> bucketItem;
     private final Identifier sourceFluidId;
     private final Identifier blockId;
@@ -27,6 +29,7 @@ public final class RegisteredLiquid {
             DeferredHolder<Fluid, ? extends Fluid> sourceFluid,
             DeferredHolder<Fluid, ? extends Fluid> flowingFluid,
             DeferredBlock<? extends Block> block,
+            DeferredHolder<FluidType, FluidType> fluidType,
             Supplier<DeferredHolder<Item, ? extends Item>> bucketItem,
             Identifier sourceFluidId,
             Identifier blockId,
@@ -36,6 +39,7 @@ public final class RegisteredLiquid {
         this.sourceFluid = sourceFluid;
         this.flowingFluid = flowingFluid;
         this.block = block;
+        this.fluidType = fluidType;
         this.bucketItem = bucketItem;
         this.sourceFluidId = sourceFluidId;
         this.blockId = blockId;
@@ -44,6 +48,14 @@ public final class RegisteredLiquid {
 
     public LiquidSpec spec() {
         return spec;
+    }
+
+    public int tintArgb() {
+        return spec.tintArgb();
+    }
+
+    public DeferredHolder<FluidType, FluidType> fluidTypeHolder() {
+        return fluidType;
     }
 
     public DeferredHolder<Fluid, ? extends Fluid> sourceHolder() {
