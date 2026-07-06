@@ -117,6 +117,11 @@ public final class MarkRenderer {
         }
     }
 
+    /** Clears short-lived item preview markers (not scoped to a machine owner block). */
+    public void clearUnownedBillboardMarkers() {
+        billboardMarkers.clear();
+    }
+
     public void removeBillboardMarkerForOwner(BlockPos owner, BlockPos pos) {
         if (owner == null || pos == null) {
             return;

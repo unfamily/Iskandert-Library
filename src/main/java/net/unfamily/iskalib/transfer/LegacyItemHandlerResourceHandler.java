@@ -14,8 +14,9 @@ import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 
 /**
  * Bridges a legacy {@link IItemHandler} to NeoForge 26 {@link ResourceHandler}{@code <ItemResource>} for
- * {@link net.neoforged.neoforge.capabilities.Capabilities.Item#BLOCK} registration. Uses snapshots only when
- * delegates implement {@link IItemHandlerModifiable} (required for transactional rollback).
+ * {@link net.neoforged.neoforge.capabilities.Capabilities.Item#BLOCK} registration. Prefer delegates that
+ * implement {@link IItemHandlerModifiable} so transactional rollback uses {@code setStackInSlot}; a
+ * best-effort extract/insert fallback exists for read-only wrappers.
  */
 public final class LegacyItemHandlerResourceHandler extends SnapshotJournal<NonNullList<ItemStack>>
         implements ResourceHandler<ItemResource> {
@@ -28,6 +29,11 @@ public final class LegacyItemHandlerResourceHandler extends SnapshotJournal<NonN
 
     public static ResourceHandler<ItemResource> wrap(IItemHandler delegate) {
         return new LegacyItemHandlerResourceHandler(delegate);
+    }
+
+    /** Same as {@link #wrap(IItemHandler)} but documents that the delegate supports transactional rollback. */
+    public static ResourceHandler<ItemResource> wrapModifiable(IItemHandlerModifiable delegate) {
+        return wrap(delegate);
     }
 
     @Override
@@ -107,7 +113,31 @@ public final class LegacyItemHandlerResourceHandler extends SnapshotJournal<NonN
             }
             return;
         }
-        throw new IllegalStateException(
-                "Transactional item transfer requires IItemHandlerModifiable but got: " + delegate.getClass().getName());
+        revertViaExtractInsert(snapshot);
+    }
+
+    /**
+     * Best-effort rollback when the delegate is not {@link IItemHandlerModifiable}. Filtered wrappers
+     * should still implement modifiable {@link IItemHandlerModifiable#setStackInSlot} so rollback bypasses
+     * insert/extract policy (see Colossal Reactors resource port fix).
+     */
+    private void revertViaExtractInsert(NonNullList<ItemStack> snapshot) {
+        int slots = Math.min(snapshot.size(), delegate.getSlots());
+        for (int i = 0; i < slots; i++) {
+            ItemStack current = delegate.getStackInSlot(i);
+            ItemStack target = snapshot.get(i);
+            if (ItemStack.isSameItemSameComponents(current, target) && current.getCount() == target.getCount()) {
+                continue;
+            }
+            if (!current.isEmpty()) {
+                delegate.extractItem(i, current.getCount(), false);
+            }
+            if (!target.isEmpty()) {
+                ItemStack remainder = delegate.insertItem(i, target.copy(), false);
+                for (int slot = 0; slot < delegate.getSlots() && !remainder.isEmpty(); slot++) {
+                    remainder = delegate.insertItem(slot, remainder, false);
+                }
+            }
+        }
     }
 }
