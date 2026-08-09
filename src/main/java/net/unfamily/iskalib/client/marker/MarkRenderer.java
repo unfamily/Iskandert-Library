@@ -379,6 +379,8 @@ public class MarkRenderer {
      * Render all highlighted blocks and markers
      */
     public void render(PoseStack poseStack, float partialTick) {
+        // Area borders require RenderLevelStageEvent — see VanillaWorldMarkerClientHooks.
+
         if (highlightedBlocks.isEmpty() && billboardMarkers.isEmpty() && billboardMarkersByOwner.isEmpty()) {
             return;
         }

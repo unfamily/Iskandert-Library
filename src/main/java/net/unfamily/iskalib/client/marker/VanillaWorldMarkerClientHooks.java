@@ -7,7 +7,7 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent.Stage;
 
 /**
- * Subscribes to the level render pipeline for world markers.
+ * Subscribes to the level render pipeline for world markers and area borders.
  */
 public final class VanillaWorldMarkerClientHooks {
     private static volatile boolean registered;
@@ -32,7 +32,7 @@ public final class VanillaWorldMarkerClientHooks {
         if (event.getStage() != Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;
         }
-        PoseStack poseStack = event.getPoseStack();
-        MarkRenderer.getInstance().render(poseStack, 0.0f);
+        AreaBorderRenderer.getInstance().render(event);
+        MarkRenderer.getInstance().render(event.getPoseStack(), 0.0f);
     }
 }
