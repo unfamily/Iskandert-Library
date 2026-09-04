@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permission;
 import net.minecraft.server.permissions.PermissionLevel;
 import net.unfamily.iskalib.debug.HandItemDump;
+import net.unfamily.iskalib.reload.UtilsReloadHooks;
 
 /**
  * Library debug commands. Root {@code iska_lib_debug}, subcommand {@code hand} — same dump as mod delegation.
@@ -21,7 +22,10 @@ public final class IskaLibDebugCommand {
         dispatcher.register(Commands.literal("iska_lib_debug")
                 .requires(source -> source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(0))))
                 .then(Commands.literal("hand")
-                        .executes(IskaLibDebugCommand::executeHand)));
+                        .executes(IskaLibDebugCommand::executeHand))
+                .then(Commands.literal("reload")
+                        .requires(source -> source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(2))))
+                        .executes(IskaLibDebugCommand::executeReload)));
     }
 
     private static int executeHand(CommandContext<CommandSourceStack> context) {
@@ -31,5 +35,14 @@ public final class IskaLibDebugCommand {
             return 0;
         }
         return HandItemDump.dumpHands(player, source);
+    }
+
+    private static int executeReload(CommandContext<CommandSourceStack> context) {
+        UtilsReloadHooks.Listener listener = UtilsReloadHooks.getListener();
+        if (listener == null) {
+            context.getSource().sendFailure(Component.translatable("commands.iska_lib.debug.reload.unavailable"));
+            return 0;
+        }
+        return listener.reloadFromDatapacks(context.getSource());
     }
 }

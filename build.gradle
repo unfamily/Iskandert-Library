@@ -26,7 +26,11 @@ sourceSets.main.resources {
 }
 
 repositories {
-    // Add here additional repositories if required by some of the dependencies below.
+    maven { url = 'https://maven.ftb.dev/releases' }
+    maven {
+        url = 'https://www.cursemaven.com'
+        content { includeGroup 'curse.maven' }
+    }
 }
 
 base {
@@ -103,6 +107,13 @@ dependencies {
     // And its provides the option to then use net.minecraft as the group, and one of; client, server or joined as the module name, plus the game version as version.
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
+
+    compileOnly "dev.ftb.mods:ftb-library-neoforge:26.1.2.7"
+    localRuntime "dev.ftb.mods:ftb-library-neoforge:26.1.2.7"
+    compileOnly "dev.ftb.mods:ftb-teams-neoforge:26.1.2.4"
+    localRuntime "dev.ftb.mods:ftb-teams-neoforge:26.1.2.4"
+    compileOnly "dev.ftb.mods:ftb-quests-neoforge:26.1.2.7"
+    localRuntime "dev.ftb.mods:ftb-quests-neoforge:26.1.2.7"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
