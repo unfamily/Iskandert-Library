@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerPlayer;
 
 
 import net.unfamily.iskalib.debug.HandItemDump;
+import net.unfamily.iskalib.reload.UtilsReloadHooks;
 
 /**
  * Library debug commands. Root {@code iska_lib_debug}, subcommand {@code hand} — same dump as mod delegation.
@@ -21,7 +22,10 @@ public final class IskaLibDebugCommand {
         dispatcher.register(Commands.literal("iska_lib_debug")
                 .requires(source -> source.hasPermission(0))
                 .then(Commands.literal("hand")
-                        .executes(IskaLibDebugCommand::executeHand)));
+                        .executes(IskaLibDebugCommand::executeHand))
+                .then(Commands.literal("reload")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(IskaLibDebugCommand::executeReload)));
     }
 
     private static int executeHand(CommandContext<CommandSourceStack> context) {
@@ -31,5 +35,15 @@ public final class IskaLibDebugCommand {
             return 0;
         }
         return HandItemDump.dumpHands(player, source);
+    }
+
+    private static int executeReload(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        UtilsReloadHooks.Listener listener = UtilsReloadHooks.getListener();
+        if (listener == null) {
+            source.sendFailure(Component.translatable("commands.iska_lib.reload.unavailable"));
+            return 0;
+        }
+        return listener.reloadFromDatapacks(source);
     }
 }

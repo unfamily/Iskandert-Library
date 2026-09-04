@@ -100,6 +100,7 @@ public final class ShopTeamCommand {
                         .executes(ShopTeamCommand::listTeams))
                 .then(Commands.literal("invitations")
                         .executes(ShopTeamCommand::listInvitations))
+                .then(ShopTeamCurrencyCommand.currencyLiteral())
         );
     }
 

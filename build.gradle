@@ -13,6 +13,8 @@ group = mod_group_id
 
 repositories {
     maven { url = 'https://www.cursemaven.com' }
+    maven { url = 'https://maven.ftb.dev/releases' }
+    maven { url = 'https://maven.architectury.dev/' }
     maven { name = 'Maven Central'; url = 'https://repo1.maven.org/maven2' }
 }
 
@@ -68,10 +70,12 @@ dependencies {
 
     compileOnly 'curse.maven:architectury-api-419699:5786327'
     localRuntime 'curse.maven:architectury-api-419699:5786327'
-    compileOnly 'curse.maven:ftb-teams-forge-404468:7878281'
-    localRuntime 'curse.maven:ftb-teams-forge-404468:7878281'
-    compileOnly 'curse.maven:ftb-library-forge-404465:7746959'
-    localRuntime 'curse.maven:ftb-library-forge-404465:7746959'
+    compileOnly 'curse.maven:ftb-teams-forge-404468:8724782'
+    localRuntime 'curse.maven:ftb-teams-forge-404468:8724782'
+    compileOnly 'curse.maven:ftb-library-forge-404465:8569579'
+    localRuntime 'curse.maven:ftb-library-forge-404465:8569579'
+    compileOnly 'dev.ftb.mods:ftb-quests-neoforge:2101.1.34'
+    localRuntime 'dev.ftb.mods:ftb-quests-neoforge:2101.1.34'
 }
 
 var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {

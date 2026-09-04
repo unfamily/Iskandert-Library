@@ -201,7 +201,12 @@ public class StageRegistry {
             LOGGER.error("Failed to access world stage data");
             return false;
         }
-        
+
+        boolean already = data.hasStage(stage);
+        if (value == already) {
+            return true;
+        }
+
         if (value) {
             data.addStage(stage);
         } else {
@@ -233,7 +238,12 @@ public class StageRegistry {
             LOGGER.error("Failed to access team stage data");
             return false;
         }
-        
+
+        boolean already = data.hasTeamStage(teamName, stage);
+        if (value == already) {
+            return true;
+        }
+
         if (value) {
             data.addTeamStage(teamName, stage);
         } else {

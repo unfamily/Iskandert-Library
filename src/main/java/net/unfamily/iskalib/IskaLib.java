@@ -2,6 +2,7 @@ package net.unfamily.iskalib;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.NeoForge;
@@ -25,6 +26,14 @@ public class IskaLib {
 
     public IskaLib(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.COMMON, IskaLibConfig.SPEC);
+        if (ModList.get().isLoaded("ftbquests")) {
+            try {
+                Class.forName("net.unfamily.iskalib.integration.ftbquests.FtbQuestsIntegration")
+                        .getMethod("init").invoke(null);
+            } catch (Throwable t) {
+                LOGGER.error("Failed to initialize FTB Quests integration", t);
+            }
+        }
         IskaLibGases.initLibrary(modEventBus);
         IskaLibLiquids.initLibrary(modEventBus);
         modEventBus.addListener(IskaLibGases::registerCapabilities);

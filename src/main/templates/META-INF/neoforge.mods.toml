@@ -30,8 +30,21 @@ config="${mod_id}.mixins.json"
     ordering="NONE"
     side="BOTH"
 
+# FTB stack is fully optional (dedicated servers may omit all of these).
+[[dependencies.${mod_id}]]
+    modId="ftblibrary"
+    type="optional"
+    ordering="AFTER"
+    side="BOTH"
+
 [[dependencies.${mod_id}]]
     modId="ftbteams"
+    type="optional"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="ftbquests"
     type="optional"
     ordering="AFTER"
     side="BOTH"
