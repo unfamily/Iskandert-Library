@@ -1,5 +1,5 @@
 {
-  "type": "iska_utils:shop_currency",
+  "type": "iska_lib:shop_currency",
   "overwritable": true,
   "currencies": [
     {

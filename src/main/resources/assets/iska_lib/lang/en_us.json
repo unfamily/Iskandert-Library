@@ -19,6 +19,8 @@
   "message.iska_lib.world_backup_gate.title": "Back up this world?",
   "message.iska_lib.world_backup_gate.warning": "This world may need a backup before continuing with mod version %s.\n\nCreate a backup before loading, or continue without one.",
   "commands.iska_lib.reload.unavailable": "No datapack reload consumer registered (install Iska Utils).",
+  "commands.iska_lib.debug.wiki": "Developers wiki: %s",
+  "commands.iska_lib.debug.wiki.hover": "Open the Iskandert Utilities wiki",
   "commands.iska_lib.currency.catalog_empty": "The currency catalog is empty.",
   "shop.currency.null_coin": "Null Coin",
   "ftbquests.iska_lib.stage_label": "Stage",
