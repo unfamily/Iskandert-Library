@@ -31,6 +31,7 @@
   "commands.iska_lib.team.currency.removed": "Rimossi %s %s dal team '%s'.",
   "commands.iska_lib.team.currency.set": "Impostato il saldo %s del team '%s' a %s.",
   "commands.iska_lib.team.currency.moved": "Spostati %s %s da '%s' a '%s'.",
+  "shop.currency.null_coin": "Moneta Nulla",
   "ftbquests.iska_lib.stage_label": "Stage",
   "ftbquests.iska_lib.stage_label_remove": "Rimuovi Stage",
   "ftbquests.iska_lib.scope.player": "Giocatore",
