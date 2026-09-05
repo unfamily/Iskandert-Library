@@ -20,6 +20,7 @@
   "fluid.iska_lib.gas_fluid_example": "Gas di Esempio",
   "commands.iska_lib.reload.unavailable": "Nessun consumer per il reload dei datapack registrato (installa Iska Utils).",
   "commands.iska_lib.currency.catalog_empty": "Il catalogo delle valute è vuoto.",
+  "shop.currency.null_coin": "Moneta Nulla",
   "ftbquests.iska_lib.stage_label": "Stage",
   "ftbquests.iska_lib.stage_label_remove": "Rimuovi Stage",
   "ftbquests.iska_lib.scope.player": "Giocatore",

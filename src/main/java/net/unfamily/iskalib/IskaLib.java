@@ -17,6 +17,7 @@ import net.unfamily.iskalib.client.marker.VanillaWorldMarkerClientHooks;
 import net.unfamily.iskalib.explosion.ExplosionSystem;
 import net.unfamily.iskalib.gas.IskaLibGases;
 import net.unfamily.iskalib.liquid.IskaLibLiquids;
+import net.unfamily.iskalib.shop.ShopCurrencyCatalog;
 
 //change_hash
 @Mod(IskaLib.MOD_ID)
@@ -38,6 +39,8 @@ public class IskaLib {
         IskaLibLiquids.initLibrary(modEventBus);
         modEventBus.addListener(IskaLibGases::registerCapabilities);
         NeoForge.EVENT_BUS.register(ExplosionSystem.class);
+        ShopCurrencyCatalog.bootstrapFromJar();
+        ShopCurrencyCatalog.installAsDefaultListener();
         if (isPhysicalClient()) {
             VanillaWorldMarkerClientHooks.registerIfNeeded(NeoForge.EVENT_BUS);
         }
