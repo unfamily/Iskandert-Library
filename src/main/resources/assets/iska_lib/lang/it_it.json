@@ -19,6 +19,8 @@
   "message.iska_lib.world_backup_gate.warning": "Questo mondo potrebbe richiedere un backup prima di continuare con la versione mod %s.\n\nCrea un backup prima di caricare, oppure continua senza backup.",
   "fluid.iska_lib.gas_fluid_example": "Gas di Esempio",
   "commands.iska_lib.debug.reload.unavailable": "Nessun consumer per il reload dei datapack registrato (installa Iska Utils).",
+  "commands.iska_lib.debug.wiki": "Wiki sviluppatori: %s",
+  "commands.iska_lib.debug.wiki.hover": "Apri la wiki di Iskandert Utilities",
   "commands.iska_lib.team.currency.empty": "Il catalogo delle valute è vuoto.",
   "commands.iska_lib.team.currency.header": "=== Valute disponibili ===",
   "commands.iska_lib.team.currency.no_team": "Non fai parte di un team.",

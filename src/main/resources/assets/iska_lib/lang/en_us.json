@@ -19,6 +19,8 @@
   "message.iska_lib.world_backup_gate.title": "Back up this world?",
   "message.iska_lib.world_backup_gate.warning": "This world may need a backup before continuing with mod version %s.\n\nCreate a backup before loading, or continue without one.",
   "commands.iska_lib.debug.reload.unavailable": "No datapack reload consumer registered (install Iska Utils).",
+  "commands.iska_lib.debug.wiki": "Developers wiki: %s",
+  "commands.iska_lib.debug.wiki.hover": "Open the Iskandert Utilities wiki",
   "commands.iska_lib.team.currency.empty": "The currency catalog is empty.",
   "commands.iska_lib.team.currency.header": "=== Available Currencies ===",
   "commands.iska_lib.team.currency.no_team": "You are not in a team.",
