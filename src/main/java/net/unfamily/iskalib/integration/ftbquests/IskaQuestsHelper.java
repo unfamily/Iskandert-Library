@@ -16,6 +16,7 @@ import java.util.Locale;
 final class IskaQuestsHelper {
     static final String[] SCOPES = {"player", "world", "team"};
     static final String[] STAGE_MODES = {"add", "remove"};
+    static final String[] STAGE_REQUIREMENTS = {"true", "false"};
 
     private IskaQuestsHelper() {}
 
@@ -72,6 +73,13 @@ final class IskaQuestsHelper {
         return stagePlayerTitle(stage, false);
     }
 
+    static MutableComponent stageRequirementTitle(String stage, boolean is) {
+        String id = stage == null || stage.isBlank() ? "?" : stage;
+        return Component.translatable("ftbquests.iska_lib.stage_require.is_" + is)
+                .append(": ")
+                .append(Component.literal(id).withStyle(is ? ChatFormatting.YELLOW : ChatFormatting.RED));
+    }
+
     static MutableComponent stagePlayerTitle(String stage, boolean remove) {
         String id = stage == null || stage.isBlank() ? "?" : stage;
         return Component.translatable(remove ? "ftbquests.iska_lib.stage_label_remove" : "ftbquests.iska_lib.stage_label")
@@ -107,6 +115,18 @@ final class IskaQuestsHelper {
                         .name(scope -> Component.translatable("ftbquests.iska_lib.scope." + scope))
                         .create()
         ).setNameKey(nameKey);
+    }
+
+    static void addStageRequirementSelector(ConfigGroup config, boolean current, java.util.function.Consumer<Boolean> setter) {
+        String selected = Boolean.toString(current);
+        config.addEnum(
+                "is",
+                selected,
+                value -> setter.accept(Boolean.parseBoolean(value)),
+                NameMap.of(selected, STAGE_REQUIREMENTS)
+                        .name(value -> Component.translatable("ftbquests.iska_lib.stage_require.is_" + value))
+                        .create()
+        ).setNameKey("ftbquests.task.iska_lib.iska_stage.is");
     }
 
     static void addStageModeSelector(ConfigGroup config, String current, java.util.function.Consumer<String> setter, String nameKey) {

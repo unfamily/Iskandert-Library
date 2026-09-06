@@ -24,6 +24,7 @@ public class IskaStageTask extends AbstractBooleanTask {
 
     private String stage = "";
     private String scope = "player";
+    private boolean is = true;
 
     public IskaStageTask(long id, Quest quest) {
         super(id, quest);
@@ -39,6 +40,7 @@ public class IskaStageTask extends AbstractBooleanTask {
         super.writeData(nbt, provider);
         nbt.putString("stage", stage);
         nbt.putString("scope", scope);
+        nbt.putBoolean("is", is);
     }
 
     @Override
@@ -46,6 +48,7 @@ public class IskaStageTask extends AbstractBooleanTask {
         super.readData(nbt, provider);
         stage = nbt.getString("stage");
         scope = IskaQuestsHelper.normalizeScope(nbt.getString("scope"));
+        is = !nbt.contains("is") || nbt.getBoolean("is");
     }
 
     @Override
@@ -53,6 +56,7 @@ public class IskaStageTask extends AbstractBooleanTask {
         super.writeNetData(buffer);
         buffer.writeUtf(stage, Short.MAX_VALUE);
         buffer.writeUtf(scope, 16);
+        buffer.writeBoolean(is);
     }
 
     @Override
@@ -60,6 +64,7 @@ public class IskaStageTask extends AbstractBooleanTask {
         super.readNetData(buffer);
         stage = buffer.readUtf(Short.MAX_VALUE);
         scope = IskaQuestsHelper.normalizeScope(buffer.readUtf(16));
+        is = buffer.readBoolean();
     }
 
     @Override
@@ -74,11 +79,15 @@ public class IskaStageTask extends AbstractBooleanTask {
             scope = value;
             clearCachedData();
         }, "ftbquests.task.iska_lib.iska_stage.scope");
+        IskaQuestsHelper.addStageRequirementSelector(config, is, value -> {
+            is = value;
+            clearCachedData();
+        });
     }
 
     @Override
     public MutableComponent getAltTitle() {
-        return IskaQuestsHelper.stagePlayerTitle(stage);
+        return IskaQuestsHelper.stageRequirementTitle(stage, is);
     }
 
     @Override
@@ -93,11 +102,12 @@ public class IskaStageTask extends AbstractBooleanTask {
             return false;
         }
         StageRegistry registry = StageRegistry.getInstance(player.getServer());
-        return switch (scope) {
+        boolean hasStage = switch (scope) {
             case "world" -> registry.hasWorldStage(stage);
             case "team" -> registry.hasPlayerTeamStage(player, stage);
             default -> registry.hasPlayerStage(player, stage);
         };
+        return is == hasStage;
     }
 
     public static void checkStages(ServerPlayer player) {
