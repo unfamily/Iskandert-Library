@@ -25,6 +25,7 @@ public final class IskaStageTask extends AbstractBooleanTask {
 
     private String stage = "";
     private String scope = "player";
+    private boolean is = true;
 
     public IskaStageTask(long id, Quest quest) {
         super(id, quest);
@@ -39,6 +40,7 @@ public final class IskaStageTask extends AbstractBooleanTask {
     public void writeData(Json5Object json, HolderLookup.Provider provider) {
         super.writeData(json, provider);
         json.addProperty("stage", stage);
+        json.addProperty("is", is);
         if (!scope.equals("player")) json.addProperty("scope", scope);
     }
 
@@ -47,6 +49,7 @@ public final class IskaStageTask extends AbstractBooleanTask {
         super.readData(json, provider);
         stage = Json5Util.getString(json, "stage").orElse("");
         scope = IskaQuestsHelper.normalizeScope(Json5Util.getString(json, "scope").orElse("player"));
+        is = Json5Util.getBoolean(json, "is").orElse(true);
     }
 
     @Override
@@ -54,6 +57,7 @@ public final class IskaStageTask extends AbstractBooleanTask {
         super.writeNetData(buffer);
         buffer.writeUtf(stage, Short.MAX_VALUE);
         buffer.writeUtf(scope, 16);
+        buffer.writeBoolean(is);
     }
 
     @Override
@@ -61,6 +65,7 @@ public final class IskaStageTask extends AbstractBooleanTask {
         super.readNetData(buffer);
         stage = buffer.readUtf(Short.MAX_VALUE);
         scope = IskaQuestsHelper.normalizeScope(buffer.readUtf(16));
+        is = buffer.readBoolean();
     }
 
     @Override
@@ -75,11 +80,15 @@ public final class IskaStageTask extends AbstractBooleanTask {
             scope = value;
             clearCachedData();
         }, "ftbquests.task.iska_lib.iska_stage.scope");
+        IskaQuestsHelper.addStageRequirementSelector(config, is, value -> {
+            is = value;
+            clearCachedData();
+        });
     }
 
     @Override
     public MutableComponent getAltTitle() {
-        return IskaQuestsHelper.stagePlayerTitle(stage);
+        return IskaQuestsHelper.stageRequirementTitle(stage, is);
     }
 
     @Override
@@ -94,11 +103,12 @@ public final class IskaStageTask extends AbstractBooleanTask {
             return false;
         }
         StageRegistry registry = StageRegistry.getInstance(player.level().getServer());
-        return switch (scope) {
+        boolean hasStage = switch (scope) {
             case "world" -> registry.hasWorldStage(stage);
             case "team" -> registry.hasPlayerTeamStage(player, stage);
             default -> registry.hasPlayerStage(player, stage);
         };
+        return is == hasStage;
     }
 
     public static void checkStages(ServerPlayer player) {

@@ -49,9 +49,9 @@ public final class FtbQuestsIntegration {
         IskaStageTask.TYPE = TaskTypes.register(stageId, IskaStageTask::new, () -> Icons.CONTROLLER);
         IskaStageReward.TYPE = RewardTypes.register(stageId, IskaStageReward::new, () -> Icons.CONTROLLER);
         IskaCurrencyTask.TYPE = TaskTypes.register(currencyId, IskaCurrencyTask::new,
-                () -> Icon.getIcon("iska_lib:textures/gui/null_coin.png"));
+                () -> Icon.getIcon("iska_utils:textures/gui/icons/null_coin.png"));
         IskaCurrencyReward.TYPE = RewardTypes.register(currencyId, IskaCurrencyReward::new,
-                () -> Icon.getIcon("iska_lib:textures/gui/null_coin.png"));
+                () -> Icon.getIcon("iska_utils:textures/gui/icons/null_coin.png"));
 
         StageHooks.addListener(STAGE_LISTENER);
         initialized = true;
