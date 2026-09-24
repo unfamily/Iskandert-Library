@@ -18,6 +18,8 @@ public class IskaCurrencyReward extends Reward {
     private String currency = "null_coin";
     private double amount = 1.0;
     private boolean remove;
+    /** B5: Currency rewards always target the team; defaults to true. */
+    private boolean teamReward = true;
 
     public IskaCurrencyReward(long id, Quest quest) {
         super(id, quest);
@@ -34,6 +36,7 @@ public class IskaCurrencyReward extends Reward {
         nbt.putString("currency", currency);
         nbt.putDouble("amount", amount);
         nbt.putBoolean("remove", remove);
+        nbt.putBoolean("team_reward", teamReward);
     }
 
     @Override
@@ -42,6 +45,7 @@ public class IskaCurrencyReward extends Reward {
         currency = nbt.contains("currency") ? nbt.getString("currency") : "null_coin";
         amount = Math.max(0.0, nbt.contains("amount") ? nbt.getDouble("amount") : 1.0);
         remove = nbt.getBoolean("remove");
+        teamReward = !nbt.contains("team_reward") || nbt.getBoolean("team_reward");
     }
 
     @Override
@@ -50,6 +54,7 @@ public class IskaCurrencyReward extends Reward {
         buffer.writeUtf(currency, Short.MAX_VALUE);
         buffer.writeDouble(amount);
         buffer.writeBoolean(remove);
+        buffer.writeBoolean(teamReward);
     }
 
     @Override
@@ -58,6 +63,7 @@ public class IskaCurrencyReward extends Reward {
         currency = buffer.readUtf(Short.MAX_VALUE);
         amount = Math.max(0.0, buffer.readDouble());
         remove = buffer.readBoolean();
+        teamReward = buffer.readBoolean();
     }
 
     @Override
@@ -74,6 +80,11 @@ public class IskaCurrencyReward extends Reward {
                 }, 1.0, 0.0, Double.MAX_VALUE)
                 .setNameKey("ftbquests.reward.iska_lib.iska_currency.amount");
         config.addBool("remove", remove, value -> remove = value, false);
+        // B5: team_reward toggle — currency rewards always operate on the team; default true
+        config.addBool("team_reward", teamReward, value -> {
+            teamReward = value;
+            clearCachedData();
+        }, true).setNameKey("ftbquests.reward.iska_lib.iska_currency.team_reward");
     }
 
     @Override
@@ -92,19 +103,17 @@ public class IskaCurrencyReward extends Reward {
                     ? manager.removeTeamCurrency(team, currency, amount)
                     : manager.addTeamCurrency(team, currency, amount));
         }
-        if (notify) {
-            player.sendSystemMessage(Component.translatable(
-                    success
-                            ? (remove ? "ftbquests.reward.iska_lib.iska_currency.removed"
-                                    : "ftbquests.reward.iska_lib.iska_currency.added")
-                            : "ftbquests.reward.iska_lib.iska_currency.failed",
-                    IskaQuestsHelper.formatAmount(amount),
-                    IskaQuestsHelper.currencyDisplayName(currency)), true);
-        }
+        // B2: actionbar feedback removed — silent claim.
     }
 
     @Override
     public MutableComponent getAltTitle() {
+        // Team currency rewards keep the default (non-blue) title.
         return IskaQuestsHelper.currencyPlayerTitle(currency, amount);
+    }
+
+    @Override
+    public String getButtonText() {
+        return IskaQuestsHelper.abbreviateAmount(amount);
     }
 }

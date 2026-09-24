@@ -8,6 +8,7 @@ import dev.ftb.mods.ftbquests.quest.task.TaskType;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -129,5 +130,14 @@ public class IskaCurrencyTask extends AbstractBooleanTask {
     @Override
     public MutableComponent getAltTitle() {
         return IskaQuestsHelper.currencyPlayerTitle(currency, amount);
+    }
+
+    /**
+     * Overlay under the coin icon in the quest panel.
+     * AbstractBooleanTask would otherwise show progress max {@code 1} when {@link #consumesResources()}.
+     */
+    @Override
+    public MutableComponent getButtonText() {
+        return Component.literal(IskaQuestsHelper.abbreviateAmount(amount));
     }
 }

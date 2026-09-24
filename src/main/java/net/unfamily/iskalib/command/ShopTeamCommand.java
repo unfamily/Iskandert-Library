@@ -15,10 +15,16 @@ import net.minecraft.server.level.ServerPlayer;
 
 import net.unfamily.iskalib.team.ShopTeamManager;
 
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import net.minecraft.commands.SharedSuggestionProvider;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Team management commands exposed by the shared library.
@@ -30,6 +36,26 @@ public final class ShopTeamCommand {
             Component.literal("No player found from selector"));
 
     private ShopTeamCommand() {}
+
+    /**
+     * B1: Suggestion provider for player targets.
+     * Only suggests online player names and @ selectors; filters out other Brigadier suggestions.
+     */
+    private static final SuggestionProvider<CommandSourceStack> SUGGEST_ONLINE_PLAYERS = (context, builder) -> {
+        try {
+            var server = context.getSource().getServer();
+            Stream<String> players = server == null
+                    ? Stream.empty()
+                    : server.getPlayerList().getPlayers().stream().map(p -> p.getName().getString());
+            List<String> suggestions = Stream.concat(
+                    Stream.of("@a", "@p", "@r", "@s", "@e", "@n"),
+                    players
+            ).collect(Collectors.toList());
+            return SharedSuggestionProvider.suggest(suggestions, builder);
+        } catch (Exception e) {
+            return SharedSuggestionProvider.suggest(List.of("@a", "@p", "@r", "@s", "@e", "@n"), builder);
+        }
+    };
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("iska_lib_team")
@@ -49,20 +75,20 @@ public final class ShopTeamCommand {
                                         .requires(source -> source.hasPermission(2))
                                         .executes(ShopTeamCommand::renameTeam))))
                 .then(Commands.literal("leader")
-                        .then(Commands.argument("newLeader", EntityArgument.players())
+                        .then(Commands.argument("newLeader", EntityArgument.players()).suggests(SUGGEST_ONLINE_PLAYERS)
                                 .executes(ShopTeamCommand::transferOwnTeamLeadership)
                                 .then(Commands.argument("teamName", StringArgumentType.word())
                                         .requires(source -> source.hasPermission(2))
                                         .executes(ShopTeamCommand::transferTeamLeadership))))
                 .then(Commands.literal("assistant")
                         .then(Commands.literal("add")
-                                .then(Commands.argument("player", EntityArgument.players())
+                                .then(Commands.argument("player", EntityArgument.players()).suggests(SUGGEST_ONLINE_PLAYERS)
                                         .executes(ShopTeamCommand::addAssistantToOwnTeam)
                                         .then(Commands.argument("teamName", StringArgumentType.word())
                                                 .requires(source -> source.hasPermission(2))
                                                 .executes(ShopTeamCommand::addTeamAssistant))))
                         .then(Commands.literal("remove")
-                                .then(Commands.argument("player", EntityArgument.players())
+                                .then(Commands.argument("player", EntityArgument.players()).suggests(SUGGEST_ONLINE_PLAYERS)
                                         .executes(ShopTeamCommand::removeAssistantFromOwnTeam)
                                         .then(Commands.argument("teamName", StringArgumentType.word())
                                                 .requires(source -> source.hasPermission(2))
@@ -72,13 +98,13 @@ public final class ShopTeamCommand {
                         .then(Commands.argument("teamName", StringArgumentType.word())
                                 .executes(ShopTeamCommand::listTeamAssistants)))
                 .then(Commands.literal("invite")
-                        .then(Commands.argument("player", EntityArgument.players())
+                        .then(Commands.argument("player", EntityArgument.players()).suggests(SUGGEST_ONLINE_PLAYERS)
                                 .executes(ShopTeamCommand::inviteToOwnTeam)
                                 .then(Commands.argument("teamName", StringArgumentType.word())
                                         .requires(source -> source.hasPermission(2))
                                         .executes(ShopTeamCommand::inviteToTeam))))
                 .then(Commands.literal("cancelInvite")
-                        .then(Commands.argument("player", EntityArgument.players())
+                        .then(Commands.argument("player", EntityArgument.players()).suggests(SUGGEST_ONLINE_PLAYERS)
                                 .executes(ShopTeamCommand::cancelInviteFromOwnTeam)
                                 .then(Commands.argument("teamName", StringArgumentType.word())
                                         .requires(source -> source.hasPermission(2))

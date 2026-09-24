@@ -65,9 +65,15 @@ public final class IskaLibFluidClient {
                     return tint;
                 }
 
+                /**
+                 * B4: Return fully-transparent tint for world-space rendering so the vanilla fluid mesh
+                 * does not double-render on top of the GasLiquidBlock model.
+                 * GUI/JEI/bucket contexts use the no-arg {@link #getTintColor()} which returns the real tint.
+                 * (NeoForge 1.21.1 lacks RegisterFluidModelsEvent / CustomFluidRenderer present in 26+)
+                 */
                 @Override
                 public int getTintColor(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
-                    return tint;
+                    return 0x00000000; // alpha=0 → fluid mesh invisible in world
                 }
             }, gas.fluidTypeHolder().get());
         }

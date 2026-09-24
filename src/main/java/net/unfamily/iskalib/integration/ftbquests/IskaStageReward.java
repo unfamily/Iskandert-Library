@@ -19,6 +19,11 @@ public class IskaStageReward extends Reward {
     private String scope = "player";
     /** {@code add} grants the stage; {@code remove} clears it. */
     private String mode = "add";
+    /**
+     * When scope is "team", whether to distribute this reward to the entire team.
+     * Hidden in the config UI when scope != "team"; defaults to true when scope == "team".
+     */
+    private boolean teamReward = true;
 
     public IskaStageReward(long id, Quest quest) {
         super(id, quest);
@@ -36,6 +41,7 @@ public class IskaStageReward extends Reward {
         nbt.putString("scope", scope);
         nbt.putString("mode", mode);
         nbt.putBoolean("remove", IskaQuestsHelper.isRemoveStageMode(mode));
+        if ("team".equals(scope)) nbt.putBoolean("team_reward", teamReward);
     }
 
     @Override
@@ -48,6 +54,7 @@ public class IskaStageReward extends Reward {
         } else {
             mode = nbt.getBoolean("remove") ? "remove" : "add";
         }
+        teamReward = "team".equals(scope) && (!nbt.contains("team_reward") || nbt.getBoolean("team_reward"));
     }
 
     @Override
@@ -56,6 +63,7 @@ public class IskaStageReward extends Reward {
         buffer.writeUtf(stage, Short.MAX_VALUE);
         buffer.writeUtf(scope, 16);
         buffer.writeUtf(mode, 16);
+        buffer.writeBoolean(teamReward);
     }
 
     @Override
@@ -64,6 +72,7 @@ public class IskaStageReward extends Reward {
         stage = buffer.readUtf(Short.MAX_VALUE);
         scope = IskaQuestsHelper.normalizeScope(buffer.readUtf(16));
         mode = IskaQuestsHelper.normalizeStageMode(buffer.readUtf(16));
+        teamReward = buffer.readBoolean();
     }
 
     @Override
@@ -75,13 +84,25 @@ public class IskaStageReward extends Reward {
                 }, "")
                 .setNameKey("ftbquests.reward.iska_lib.iska_stage.stage");
         IskaQuestsHelper.addScopeSelector(config, scope, value -> {
+            String previous = scope;
             scope = value;
+            // B5: default teamReward = true when switching to team scope
+            if ("team".equals(scope) && !"team".equals(previous)) {
+                teamReward = true;
+            }
             clearCachedData();
         }, "ftbquests.reward.iska_lib.iska_stage.scope");
         IskaQuestsHelper.addStageModeSelector(config, mode, value -> {
             mode = value;
             clearCachedData();
         }, "ftbquests.reward.iska_lib.iska_stage.mode");
+        // B5: team_reward toggle — only visible when scope == "team"
+        if ("team".equals(scope)) {
+            config.addBool("team_reward", teamReward, value -> {
+                teamReward = value;
+                clearCachedData();
+            }, true).setNameKey("ftbquests.reward.iska_lib.iska_stage.team_reward");
+        }
     }
 
     @Override
@@ -103,16 +124,12 @@ public class IskaStageReward extends Reward {
                 default -> registry.setPlayerStage(player, stage, enable);
             };
         }
-        if (notify && success) {
-            player.sendSystemMessage(Component.translatable(
-                    remove ? "ftbquests.reward.iska_lib.iska_stage.removed"
-                            : "ftbquests.reward.iska_lib.iska_stage.added",
-                    stage, scope), true);
-        }
+        // B2: actionbar feedback removed — silent claim.
     }
 
     @Override
     public MutableComponent getAltTitle() {
+        // Team-only rewards keep the default (non-blue) title — FTB paints team rewards aqua.
         return IskaQuestsHelper.stagePlayerTitle(stage, IskaQuestsHelper.isRemoveStageMode(mode));
     }
 }
