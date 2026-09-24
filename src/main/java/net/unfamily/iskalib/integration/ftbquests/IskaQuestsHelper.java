@@ -62,6 +62,39 @@ final class IskaQuestsHelper {
         return Double.toString(amount);
     }
 
+    /**
+     * Compact overlay text for currency icons (quest task/reward buttons).
+     * Abbreviates from 10k upward: {@code 10k}, {@code 1.5M}, {@code 1B}.
+     */
+    static String abbreviateAmount(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return "0";
+        }
+        double abs = Math.abs(value);
+        String sign = value < 0 ? "-" : "";
+        if (abs >= 1_000_000_000.0) {
+            return sign + formatShort(abs / 1_000_000_000.0) + "B";
+        }
+        if (abs >= 1_000_000.0) {
+            return sign + formatShort(abs / 1_000_000.0) + "M";
+        }
+        if (abs >= 10_000.0) {
+            return sign + formatShort(abs / 1_000.0) + "k";
+        }
+        if (value == Math.rint(value)) {
+            return String.valueOf((long) value);
+        }
+        return String.format(Locale.ROOT, "%.1f", value);
+    }
+
+    private static String formatShort(double v) {
+        if (v == Math.rint(v) && v < 1000) {
+            return String.valueOf((long) v);
+        }
+        String s = String.format(Locale.ROOT, "%.1f", v);
+        return s.endsWith(".0") ? s.substring(0, s.length() - 2) : s;
+    }
+
     /** Player-facing title, e.g. {@code Null Coin: 1.0}. */
     static MutableComponent currencyPlayerTitle(String currencyId, double amount) {
         return currencyDisplayName(currencyId).copy()

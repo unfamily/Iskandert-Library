@@ -33,6 +33,23 @@ public final class ShopTeamCurrencyCommand {
     private static final SuggestionProvider<CommandSourceStack> SUGGEST_TEAMS = (context, builder) ->
             SharedSuggestionProvider.suggest(manager(context.getSource()).getAllTeamNames(), builder);
 
+    /** B1: Only online player names and @ selectors; filters out other Brigadier entity suggestions. */
+    private static final SuggestionProvider<CommandSourceStack> SUGGEST_ONLINE_PLAYERS = (context, builder) -> {
+        try {
+            var server = context.getSource().getServer();
+            java.util.stream.Stream<String> players = server == null
+                    ? java.util.stream.Stream.empty()
+                    : server.getPlayerList().getPlayers().stream().map(p -> p.getName().getString());
+            java.util.List<String> suggestions = java.util.stream.Stream.concat(
+                    java.util.stream.Stream.of("@a", "@p", "@r", "@s", "@e", "@n"),
+                    players
+            ).collect(java.util.stream.Collectors.toList());
+            return SharedSuggestionProvider.suggest(suggestions, builder);
+        } catch (Exception e) {
+            return SharedSuggestionProvider.suggest(java.util.List.of("@a", "@p", "@r", "@s", "@e", "@n"), builder);
+        }
+    };
+
     public static ArgumentBuilder<CommandSourceStack, ?> currencyLiteral() {
         return Commands.literal("currency")
                 .then(Commands.literal("list")
@@ -54,7 +71,7 @@ public final class ShopTeamCurrencyCommand {
                                                         .suggests(SUGGEST_TEAMS)
                                                         .executes(ShopTeamCurrencyCommand::setForTeam)))
                                         .then(Commands.literal("player")
-                                                .then(Commands.argument("player", EntityArgument.entities())
+                                                .then(Commands.argument("player", EntityArgument.entities()).suggests(SUGGEST_ONLINE_PLAYERS)
                                                         .executes(ShopTeamCurrencyCommand::setForPlayerTeams))))))
                 .then(Commands.literal("move")
                         .requires(ShopTeamCurrencyCommand::isAdmin)
@@ -79,7 +96,7 @@ public final class ShopTeamCurrencyCommand {
                                         .suggests(SUGGEST_TEAMS)
                                         .executes(add ? ShopTeamCurrencyCommand::addToTeam : ShopTeamCurrencyCommand::removeFromTeam)))
                         .then(Commands.literal("player")
-                                .then(Commands.argument("player", EntityArgument.entities())
+                                .then(Commands.argument("player", EntityArgument.entities()).suggests(SUGGEST_ONLINE_PLAYERS)
                                         .executes(add ? ShopTeamCurrencyCommand::addToPlayerTeams : ShopTeamCurrencyCommand::removeFromPlayerTeams))));
     }
 
