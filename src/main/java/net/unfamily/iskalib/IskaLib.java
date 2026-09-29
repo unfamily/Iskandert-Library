@@ -19,6 +19,7 @@ import net.unfamily.iskalib.gas.IskaLibGases;
 import net.unfamily.iskalib.liquid.IskaLibLiquids;
 import net.unfamily.iskalib.liquid.LiquidJsonLoader;
 import net.unfamily.iskalib.shop.ShopCurrencyCatalog;
+import net.unfamily.iskalib.stage.StageBootstrap;
 
 //change_hash
 @Mod(IskaLib.MOD_ID)
@@ -47,7 +48,8 @@ public class IskaLib {
         }
         IskaLibGases.initLibrary(modEventBus);
         IskaLibLiquids.initLibrary(modEventBus);
-        LiquidJsonLoader.bootstrapFromJar();
+        LiquidJsonLoader.bootstrapAndRegister(true);
+        StageBootstrap.install();
         modEventBus.addListener(IskaLibGases::registerCapabilities);
         NeoForge.EVENT_BUS.register(ExplosionSystem.class);
         ShopCurrencyCatalog.bootstrapFromJar();

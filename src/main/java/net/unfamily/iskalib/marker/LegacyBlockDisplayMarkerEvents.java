@@ -51,9 +51,6 @@ public final class LegacyBlockDisplayMarkerEvents {
         }
         try {
             ScannerMarkerCleanup.cleanupOrphanedMarkers(serverLevel);
-            if (serverLevel.getGameTime() % 1200 == 0) {
-                LOGGER.debug("Checked orphaned legacy block_display scanner markers");
-            }
         } catch (Exception e) {
             LOGGER.error("Error cleaning legacy scanner markers: {}", e.getMessage());
         }
