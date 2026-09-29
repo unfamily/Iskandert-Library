@@ -11,6 +11,7 @@ import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.unfamily.iskalib.IskaLib;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,19 +19,53 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Public API: consumer mods register normal liquids on their mod event bus (NeoForge 26.1.2+).
+ * Public API: consumer mods register normal liquids on their mod event bus.
  * Mirrors {@link net.unfamily.iskalib.gas.IskaLibGases} and Colossal Reactors {@code ModFluids.registerTintedFluid}.
  * <p>
  * Pass the consumer's existing {@link DeferredRegister} instances via {@link LiquidRegistrationRegisters}.
- * Not for Minecraft 1.21.1 — consumers on older lines ship an in-mod copy (see IskaUtils {@code ModFluids}).
+ * Runtime infinity / loggable / dimension-tick overlays come from {@link LiquidBehaviorRegistry}
+ * (see {@link OverlayAwareFluidType} and {@link DimensionTickLiquidBlock}).
+ * <p>
+ * Library also owns registers for fluids declared under {@code data/iska_lib/iska_lib/liquids/}
+ * (see {@link LiquidJsonLoader#bootstrapAndRegister}).
  */
 public final class IskaLibLiquids {
     private static final Map<String, ModLiquidRegistration> BY_MOD = new ConcurrentHashMap<>();
+    private static IEventBus libraryModEventBus;
+    private static boolean libraryRegistersReady;
 
     private IskaLibLiquids() {}
 
     public static void initLibrary(IEventBus iskaLibModEventBus) {
-        // Reserved for global hooks if needed later.
+        libraryModEventBus = iskaLibModEventBus;
+        IskaLibOwnedLiquidRegisters.register(iskaLibModEventBus);
+        libraryRegistersReady = true;
+    }
+
+    /**
+     * Registers a liquid owned by {@code iska_lib} using Library deferred registers.
+     * Used by {@link LiquidJsonLoader} for jar-scoped JSON fluids.
+     */
+    public static RegisteredLiquid registerLibraryLiquid(LiquidSpec spec) {
+        if (!libraryRegistersReady || libraryModEventBus == null) {
+            throw new IllegalStateException("IskaLibLiquids.initLibrary must run before registerLibraryLiquid");
+        }
+        if (!IskaLib.MOD_ID.equals(spec.modId())) {
+            throw new IllegalArgumentException("Library-owned liquids must use modId " + IskaLib.MOD_ID + ", got " + spec.modId());
+        }
+        return registerLiquid(libraryModEventBus, IskaLibOwnedLiquidRegisters.asLiquidRegisters(), spec);
+    }
+
+    public static boolean isRegistered(Identifier fluidId) {
+        if (fluidId == null) {
+            return false;
+        }
+        for (RegisteredLiquid liquid : allRegisteredLiquids()) {
+            if (fluidId.equals(liquid.sourceFluidId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void hookClientEventsOnce(IEventBus modEventBus) {
@@ -111,8 +146,16 @@ public final class IskaLibLiquids {
                 DeferredHolder<Item, net.minecraft.world.item.BucketItem> bucket;
             };
 
-            refs.fluidType = fluidTypes.register(spec.fluidSourceId() + "_type", () -> new FluidType(
-                    finalTypeProperties.build(spec.descriptionId(), spec.lightLevel(), spec.sounds())));
+            Identifier sourceFluidId = Identifier.fromNamespaceAndPath(modId, spec.fluidSourceId());
+            Identifier blockId = Identifier.fromNamespaceAndPath(modId, spec.blockId());
+            Identifier bucketId = Identifier.fromNamespaceAndPath(modId, spec.bucketId());
+
+            refs.fluidType = fluidTypes.register(spec.fluidSourceId() + "_type", () -> new OverlayAwareFluidType(
+                    finalTypeProperties.build(spec.descriptionId(), spec.lightLevel(), spec.sounds()),
+                    sourceFluidId,
+                    finalTypeProperties.canConvertToSource(),
+                    finalTypeProperties.canHydrate(),
+                    finalTypeProperties.supportsBoating()));
 
             BaseFlowingFluid.Properties fluidProps = new BaseFlowingFluid.Properties(
                     refs.fluidType,
@@ -125,14 +168,12 @@ public final class IskaLibLiquids {
             refs.source = fluids.register(spec.fluidSourceId(), () -> new BaseFlowingFluid.Source(fluidProps));
             refs.flowing = fluids.register(spec.fluidFlowingId(), () -> new BaseFlowingFluid.Flowing(fluidProps));
 
-            Identifier sourceFluidId = Identifier.fromNamespaceAndPath(modId, spec.fluidSourceId());
-            Identifier blockId = Identifier.fromNamespaceAndPath(modId, spec.blockId());
-            Identifier bucketId = Identifier.fromNamespaceAndPath(modId, spec.bucketId());
-
             LiquidBlockProperties blockProps = spec.blockProperties();
             int blockLight = blockProps.blockLightLevel() >= 0 ? blockProps.blockLightLevel() : spec.lightLevel();
             LiquidBlockFactory factory = blockProps.blockFactory();
-            if (factory == null && spec.hasDimensionTicks()) {
+            // Always use DimensionTickLiquidBlock when no custom factory so datapack overlays can add
+            // dimension_ticks later without requiring a DimensionTickLiquidBlock at Java registration time.
+            if (factory == null) {
                 List<DimensionTickTransform> transforms = spec.dimensionTicks();
                 factory = (flowing, props) -> new DimensionTickLiquidBlock(flowing, props, sourceFluidId, transforms);
             }

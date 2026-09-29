@@ -11,6 +11,8 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.unfamily.iskalib.IskaLibConfig;
+import net.unfamily.iskalib.integration.ftbchunks.FtbChunksBridge;
 import org.slf4j.Logger;
 
 import java.util.ArrayDeque;
@@ -240,6 +242,10 @@ public final class ExplosionSystem {
             int startY) {
         int blocksDestroyed = 0;
         BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
+        boolean protectFtbClaims = !IskaLibConfig.EXPLOSION_GRIEF_FTB_CLAIMS.get();
+        int lastClaimChunkX = Integer.MIN_VALUE;
+        int lastClaimChunkZ = Integer.MIN_VALUE;
+        boolean lastChunkClaimed = false;
 
         for (int x = startX; x < SUB_REGION_SIZE; x++) {
             for (int z = x == startX ? startZ : 0; z < SUB_REGION_SIZE; z++) {
@@ -260,6 +266,19 @@ public final class ExplosionSystem {
                     BlockState state = explosion.level.getBlockState(mutable);
                     if (!shouldDestroy(explosion, state, mutable)) {
                         continue;
+                    }
+
+                    if (protectFtbClaims) {
+                        int chunkX = mutable.getX() >> 4;
+                        int chunkZ = mutable.getZ() >> 4;
+                        if (chunkX != lastClaimChunkX || chunkZ != lastClaimChunkZ) {
+                            lastClaimChunkX = chunkX;
+                            lastClaimChunkZ = chunkZ;
+                            lastChunkClaimed = FtbChunksBridge.isChunkClaimed(explosion.level, mutable);
+                        }
+                        if (lastChunkClaimed) {
+                            continue;
+                        }
                     }
 
                     explosion.level.setBlock(mutable, Blocks.AIR.defaultBlockState(), 3);

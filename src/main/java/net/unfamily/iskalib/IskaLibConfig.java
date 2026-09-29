@@ -11,6 +11,13 @@ public final class IskaLibConfig {
             .comment("When true and FTB Teams is loaded, shop teams can sync with FTB team membership.")
             .define("ftbTeamsSyncEnabled", true);
 
+    public static final ModConfigSpec.BooleanValue EXPLOSION_GRIEF_FTB_CLAIMS = BUILDER
+            .comment(
+                    "When false (default), Library progressive explosions do not break blocks in FTB Chunks claimed chunks.",
+                    "Entity damage still applies. When true, claimed chunks can be griefed by those explosions.",
+                    "No effect if FTB Chunks is not loaded.")
+            .define("explosionGriefFtbClaims", false);
+
     static {
         BUILDER.comment("Stage-related gates used by Library integrations").push("stages");
         BUILDER.comment("Ultimine stage gate (consumed by Ultimine integration)").push("ultimine");

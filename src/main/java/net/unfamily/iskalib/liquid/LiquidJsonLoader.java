@@ -33,9 +33,9 @@ import java.util.stream.Stream;
  * Loads liquid definitions from {@code data/<namespace>/iska_lib/liquids/<id>.json}.
  * <p>
  * JSON cannot supply a custom {@link LiquidBlockFactory}. At Library init, jar resources under
- * {@code iska_lib} are scanned. Datapack reload updates {@link LiquidBehaviorRegistry} overlays
- * (infinity / loggable / dimension ticks) for matching fluid ids. Full fluid/block registration
- * from JSON requires a restart and a mod-init registration path via {@link IskaLibLiquids}.
+ * {@code iska_lib} are scanned and registered via {@link IskaLibLiquids#registerLibraryLiquid}
+ * (fluid + block + bucket). Datapack reload updates {@link LiquidBehaviorRegistry} overlays
+ * (infinity / loggable / dimension ticks) for matching fluid ids; new fluid ids still require a restart.
  */
 public final class LiquidJsonLoader {
     private static final Logger LOGGER = LoggerFactory.getLogger(LiquidJsonLoader.class);
@@ -47,6 +47,24 @@ public final class LiquidJsonLoader {
     private LiquidJsonLoader() {}
 
     public static void bootstrapFromJar() {
+        bootstrapAndRegister(false);
+    }
+
+    /**
+     * Scans Library jar liquids JSON, applies overlays, and registers brand-new {@code iska_lib} fluids.
+     *
+     * @param registerFluids when true, calls {@link IskaLibLiquids#registerLibraryLiquid} for each
+     *                       parsed {@code iska_lib} spec not already registered (mod-init only)
+     */
+    public static void bootstrapAndRegister(boolean registerFluids) {
+        Map<Identifier, JsonObject> parsed = scanJarLiquids();
+        if (registerFluids) {
+            registerParsedLibraryFluids(parsed);
+        }
+        applyParsed(parsed, true);
+    }
+
+    private static Map<Identifier, JsonObject> scanJarLiquids() {
         Map<Identifier, JsonObject> parsed = new LinkedHashMap<>();
         ModList.get().getModContainerById(IskaLib.MOD_ID).ifPresent(container -> {
             var owning = container.getModInfo().getOwningFile();
@@ -88,7 +106,30 @@ public final class LiquidJsonLoader {
                 LOGGER.warn("Failed to bootstrap liquid JSON from jar: {}", e.getMessage());
             }
         });
-        applyParsed(parsed, true);
+        return parsed;
+    }
+
+    private static void registerParsedLibraryFluids(Map<Identifier, JsonObject> parsed) {
+        int registered = 0;
+        for (Map.Entry<Identifier, JsonObject> entry : parsed.entrySet()) {
+            try {
+                ParsedLiquid parsedLiquid = parse(entry.getKey(), entry.getValue());
+                if (!IskaLib.MOD_ID.equals(parsedLiquid.spec().modId())) {
+                    continue;
+                }
+                if (IskaLibLiquids.isRegistered(parsedLiquid.fluidId())) {
+                    continue;
+                }
+                IskaLibLiquids.registerLibraryLiquid(parsedLiquid.spec());
+                registered++;
+                LOGGER.info("Registered library liquid from JSON: {}", parsedLiquid.fluidId());
+            } catch (RuntimeException error) {
+                LOGGER.warn("Skipping library liquid registration for {}: {}", entry.getKey(), error.getMessage());
+            }
+        }
+        if (registered > 0) {
+            LOGGER.info("Library JSON liquids registered at bootstrap: {}", registered);
+        }
     }
 
     public static void reload(ResourceManager resourceManager) {
