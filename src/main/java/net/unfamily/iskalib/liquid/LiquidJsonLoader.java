@@ -10,6 +10,7 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.neoforged.fml.ModList;
 import net.unfamily.iskalib.IskaLib;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -155,8 +156,13 @@ public final class LiquidJsonLoader {
         String descriptionId = stringOr(json, "description_id", LiquidSpec.defaultDescriptionId(namespace, name));
         int light = json.has("light") ? json.get("light").getAsInt() : 0;
         boolean bucket = !json.has("bucket") || json.get("bucket").getAsBoolean();
-        boolean infinity = boolOr(json, "infinity", boolOr(json, "can_convert_to_source", false));
-        boolean loggable = boolOr(json, "loggable", false);
+        Boolean infinityOverride = optionalBool(json, "infinity");
+        if (infinityOverride == null) {
+            infinityOverride = optionalBool(json, "can_convert_to_source");
+        }
+        Boolean loggableOverride = optionalBool(json, "loggable");
+        boolean infinity = infinityOverride != null && infinityOverride;
+        boolean loggable = loggableOverride != null && loggableOverride;
 
         Identifier still = parseTexture(json, "still", "still_texture",
                 Identifier.fromNamespaceAndPath(namespace, LiquidSpec.DEFAULT_STILL_PATH));
@@ -191,7 +197,8 @@ public final class LiquidJsonLoader {
                 ticks);
 
         Identifier fluidId = Identifier.fromNamespaceAndPath(namespace, name);
-        LiquidBehaviorRegistry.Overlay overlayBehavior = new LiquidBehaviorRegistry.Overlay(infinity, loggable, ticks);
+        LiquidBehaviorRegistry.Overlay overlayBehavior =
+                new LiquidBehaviorRegistry.Overlay(infinityOverride, loggableOverride, ticks);
         return new ParsedLiquid(fluidId, spec, overlayBehavior);
     }
 
@@ -321,6 +328,11 @@ public final class LiquidJsonLoader {
 
     private static boolean boolOr(JsonObject json, String key, boolean fallback) {
         return json.has(key) ? json.get(key).getAsBoolean() : fallback;
+    }
+
+    @Nullable
+    private static Boolean optionalBool(JsonObject json, String key) {
+        return json.has(key) ? json.get(key).getAsBoolean() : null;
     }
 
     private static String stringOr(JsonObject json, String key, String fallback) {

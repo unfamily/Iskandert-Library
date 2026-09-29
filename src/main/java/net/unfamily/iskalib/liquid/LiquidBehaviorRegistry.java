@@ -14,14 +14,17 @@ import java.util.concurrent.ConcurrentHashMap;
  * Datapack JSON cannot register new fluid blocks after registries freeze. Overlays update
  * infinity / loggable intent / dimension ticks for already-registered fluids. Full fluid block
  * registration from JSON requires a restart and a mod-init registration path.
+ * <p>
+ * When {@code infinity} or {@code loggable} is {@code null} on an overlay, callers must keep the
+ * registered default (JSON did not declare that key).
  */
 public final class LiquidBehaviorRegistry {
     public record Overlay(
-            boolean infinity,
-            boolean loggable,
+            @Nullable Boolean infinity,
+            @Nullable Boolean loggable,
             List<DimensionTickTransform> dimensionTicks
     ) {
-        public static final Overlay EMPTY = new Overlay(false, false, List.of());
+        public static final Overlay EMPTY = new Overlay(null, null, List.of());
 
         public Overlay {
             dimensionTicks = dimensionTicks == null ? List.of() : List.copyOf(dimensionTicks);
@@ -72,12 +75,18 @@ public final class LiquidBehaviorRegistry {
 
     public static boolean canConvertToSource(Identifier fluidId, boolean registeredDefault) {
         Overlay overlay = find(fluidId);
-        return overlay != null ? overlay.infinity() : registeredDefault;
+        if (overlay != null && overlay.infinity() != null) {
+            return overlay.infinity();
+        }
+        return registeredDefault;
     }
 
     public static boolean isLoggable(Identifier fluidId, boolean registeredDefault) {
         Overlay overlay = find(fluidId);
-        return overlay != null ? overlay.loggable() : registeredDefault;
+        if (overlay != null && overlay.loggable() != null) {
+            return overlay.loggable();
+        }
+        return registeredDefault;
     }
 
     public static List<DimensionTickTransform> dimensionTicks(Identifier fluidId, List<DimensionTickTransform> registered) {
