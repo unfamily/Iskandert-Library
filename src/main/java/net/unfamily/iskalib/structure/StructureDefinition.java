@@ -159,9 +159,28 @@ public class StructureDefinition {
      * Verifies if this structure can be placed based on stages
      */
     public boolean canBePlaced(net.minecraft.world.entity.player.Player player) {
-        if (stages == null || stages.isEmpty()) return true;
-        
-        // For now always returns true, complete implementation will be added later
+        if (stages == null || stages.isEmpty()) {
+            return true;
+        }
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)) {
+            return false;
+        }
+        net.minecraft.server.MinecraftServer server = serverPlayer.level().getServer();
+        if (server == null) {
+            return false;
+        }
+        net.unfamily.iskalib.stage.StageRegistry registry =
+                net.unfamily.iskalib.stage.StageRegistry.getInstance(server);
+        for (String stage : stages) {
+            if (stage == null || stage.isBlank()) {
+                continue;
+            }
+            if (!registry.hasPlayerStage(serverPlayer, stage)
+                    && !registry.hasWorldStage(stage)
+                    && !registry.hasPlayerTeamStage(serverPlayer, stage)) {
+                return false;
+            }
+        }
         return true;
     }
     

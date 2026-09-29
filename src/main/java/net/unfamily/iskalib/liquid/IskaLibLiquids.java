@@ -97,6 +97,12 @@ public final class IskaLibLiquids {
                 throw new IllegalArgumentException("LiquidSpec modId " + spec.modId() + " does not match registration modId " + modId);
             }
 
+            LiquidTypeProperties typeProperties = spec.typeProperties();
+            if (spec.blockProperties().loggable()) {
+                typeProperties = typeProperties.withLoggableDefaults();
+            }
+
+            LiquidTypeProperties finalTypeProperties = typeProperties;
             var refs = new Object() {
                 DeferredHolder<FluidType, FluidType> fluidType;
                 DeferredHolder<Fluid, BaseFlowingFluid.Source> source;
@@ -106,7 +112,7 @@ public final class IskaLibLiquids {
             };
 
             refs.fluidType = fluidTypes.register(spec.fluidSourceId() + "_type", () -> new FluidType(
-                    spec.typeProperties().build(spec.descriptionId(), spec.lightLevel(), spec.sounds())));
+                    finalTypeProperties.build(spec.descriptionId(), spec.lightLevel(), spec.sounds())));
 
             BaseFlowingFluid.Properties fluidProps = new BaseFlowingFluid.Properties(
                     refs.fluidType,
@@ -125,8 +131,20 @@ public final class IskaLibLiquids {
 
             LiquidBlockProperties blockProps = spec.blockProperties();
             int blockLight = blockProps.blockLightLevel() >= 0 ? blockProps.blockLightLevel() : spec.lightLevel();
+            LiquidBlockFactory factory = blockProps.blockFactory();
+            if (factory == null && spec.hasDimensionTicks()) {
+                List<DimensionTickTransform> transforms = spec.dimensionTicks();
+                factory = (flowing, props) -> new DimensionTickLiquidBlock(flowing, props, sourceFluidId, transforms);
+            }
+
+            LiquidBlockFactory finalFactory = factory;
             refs.block = blocks.registerBlock(spec.blockId(),
-                    props -> blockProps.createBlock(refs.flowing.get(), props),
+                    props -> {
+                        if (finalFactory != null) {
+                            return finalFactory.create(refs.flowing.get(), props);
+                        }
+                        return blockProps.createBlock(refs.flowing.get(), props);
+                    },
                     props -> props.mapColor(blockProps.mapColor())
                             .replaceable()
                             .strength(blockProps.strength())
@@ -154,6 +172,13 @@ public final class IskaLibLiquids {
 
             registered.add(liquid);
             LiquidRegistry.register(liquid);
+
+            // Seed behavior overlay from Java registration so datapack reloads can refine it.
+            LiquidBehaviorRegistry.put(sourceFluidId, new LiquidBehaviorRegistry.Overlay(
+                    finalTypeProperties.canConvertToSource(),
+                    blockProps.loggable(),
+                    spec.dimensionTicks()));
+
             return liquid;
         }
 

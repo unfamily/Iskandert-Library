@@ -21,7 +21,9 @@ import net.minecraft.server.permissions.PermissionLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.unfamily.iskalib.stage.StageActionHooks;
+import net.unfamily.iskalib.stage.StageCatalog;
 import net.unfamily.iskalib.stage.StageRegistry;
+import net.unfamily.iskalib.stage.StageReloadHooks;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -77,6 +79,7 @@ public class StageCommand {
         COMMAND_USAGE.put("clear_all", "/iska_lib_stage clear all [target player] [silent=false] [hide=false]");
 
         COMMAND_USAGE.put("call_action", "/iska_lib_stage call_action <target> <action_id> [force=false] [silent=false] [hide=false]");
+        COMMAND_USAGE.put("reload", "/iska_lib_stage reload");
     }
     
     /**
@@ -278,6 +281,8 @@ public class StageCommand {
                                     .executes(ctx -> callAction(ctx))
                                     .then(Commands.argument("hide", BoolArgumentType.bool())
                                         .executes(ctx -> callAction(ctx))))))))
+                .then(Commands.literal("reload")
+                        .executes(StageCommand::reloadStageBlock))
                 // CLEAR commands
                 .then(clearNode);
 
@@ -425,10 +430,26 @@ public class StageCommand {
                 }
                 default -> stages.addAll(registry.getAllRegisteredStages());
             }
+            stages.addAll(StageCatalog.getKnownStages());
             return SharedSuggestionProvider.suggest(new ArrayList<>(stages), builder);
         } catch (Exception e) {
             return Suggestions.empty();
         }
+    }
+
+    private static int reloadStageBlock(CommandContext<CommandSourceStack> context) {
+        StageReloadHooks.Listener listener = StageReloadHooks.getListener();
+        if (listener == null) {
+            context.getSource().sendFailure(Component.translatable("commands.iska_lib.stage.reload.unavailable"));
+            return 0;
+        }
+        int result = listener.reloadStageBlock(context.getSource());
+        if (result > 0) {
+            context.getSource().sendSuccess(
+                    () -> Component.translatable("commands.iska_lib.stage.reload.success"),
+                    true);
+        }
+        return result;
     }
 
     /** Last stage-type literal on the parsed path: player, world, team, or team_player. */

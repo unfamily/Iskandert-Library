@@ -1,11 +1,14 @@
 package net.unfamily.iskalib;
 
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
@@ -14,6 +17,7 @@ import net.unfamily.iskalib.client.marker.VanillaWorldMarkerClientHooks;
 import net.unfamily.iskalib.explosion.ExplosionSystem;
 import net.unfamily.iskalib.gas.IskaLibGases;
 import net.unfamily.iskalib.liquid.IskaLibLiquids;
+import net.unfamily.iskalib.liquid.LiquidJsonLoader;
 import net.unfamily.iskalib.shop.ShopCurrencyCatalog;
 
 //change_hash
@@ -26,6 +30,7 @@ public class IskaLib {
         modContainer.registerConfig(ModConfig.Type.COMMON, IskaLibConfig.SPEC);
         IskaLibGases.initLibrary(modEventBus);
         IskaLibLiquids.initLibrary(modEventBus);
+        LiquidJsonLoader.bootstrapFromJar();
         NeoForge.EVENT_BUS.register(ExplosionSystem.class);
         ShopCurrencyCatalog.bootstrapFromJar();
         ShopCurrencyCatalog.installAsDefaultListener();
@@ -38,8 +43,35 @@ public class IskaLib {
                 LOGGER.error("Failed to initialize FTB Quests integration", error);
             }
         }
+        if (ModList.get().isLoaded("ftbultimine")) {
+            try {
+                Class.forName("net.unfamily.iskalib.integration.ftbultimine.FtbUltimineIntegration")
+                        .getMethod("init")
+                        .invoke(null);
+            } catch (Throwable error) {
+                LOGGER.error("Failed to initialize FTB Ultimine integration", error);
+            }
+        }
         if (isPhysicalClient()) {
             VanillaWorldMarkerClientHooks.registerIfNeeded(NeoForge.EVENT_BUS);
+        }
+    }
+
+    @EventBusSubscriber(modid = MOD_ID)
+    public static final class ServerHooks {
+        private ServerHooks() {}
+
+        @SubscribeEvent
+        public static void onServerStarting(ServerStartingEvent event) {
+            if (!ModList.get().isLoaded("ftbteams")) {
+                return;
+            }
+            try {
+                Class<?> events = Class.forName("net.unfamily.iskalib.integration.ftbteams.FtbTeamsEvents");
+                events.getMethod("init").invoke(null);
+            } catch (Throwable t) {
+                LOGGER.error("Failed to initialize FTB Teams integration", t);
+            }
         }
     }
 
@@ -52,4 +84,3 @@ public class IskaLib {
         }
     }
 }
-

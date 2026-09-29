@@ -22,4 +22,3 @@ public final class IskaLibCommandBootstrap {
         ShopTeamCommand.register(dispatcher);
     }
 }
-

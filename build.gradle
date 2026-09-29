@@ -114,6 +114,8 @@ dependencies {
     localRuntime "dev.ftb.mods:ftb-teams-neoforge:26.1.2.4"
     compileOnly "dev.ftb.mods:ftb-quests-neoforge:26.1.2.7"
     localRuntime "dev.ftb.mods:ftb-quests-neoforge:26.1.2.7"
+    compileOnly "dev.ftb.mods:ftb-ultimine-neoforge:26.1.2.5"
+    localRuntime "dev.ftb.mods:ftb-ultimine-neoforge:26.1.2.5"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime

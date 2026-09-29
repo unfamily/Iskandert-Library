@@ -7,8 +7,11 @@ import net.minecraft.nbt.StringTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Util;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
+import net.unfamily.iskalib.IskaLibConfig;
+import net.unfamily.iskalib.integration.ftbteams.FtbTeamsBridge;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -75,8 +78,24 @@ public class ShopTeamManager {
     }
 
     public String getPlayerTeam(ServerPlayer player) {
+        if (player == null) {
+            return null;
+        }
         TeamData data = getTeamData();
+        if (IskaLibConfig.FTB_TEAMS_SYNC_ENABLED.get() && FtbTeamsBridge.isAvailable()) {
+            var infoOpt = FtbTeamsBridge.getEffectiveTeamInfo(player);
+            if (infoOpt.isPresent()) {
+                var info = infoOpt.get();
+                ensureShopTeamForFtb(info.teamKey(), info.displayName(), info.ownerId());
+                data.setPlayerTeam(player.getUUID(), info.teamKey());
+                return info.teamKey();
+            }
+        }
         return data.getPlayerTeam(player.getUUID());
+    }
+
+    public void setPlayerTeamMapping(UUID playerId, String teamName) {
+        getTeamData().setPlayerTeam(playerId, teamName);
     }
 
     /**
@@ -131,7 +150,16 @@ public class ShopTeamManager {
 
     public UUID getTeamLeader(String teamName) {
         TeamData data = getTeamData();
-        return data.getTeamLeader(teamName);
+        UUID leader = data.getTeamLeader(teamName);
+        if (leader != null
+                && Util.NIL_UUID.equals(leader)
+                && IskaLibConfig.FTB_TEAMS_SYNC_ENABLED.get()
+                && FtbTeamsBridge.isAvailable()) {
+            FtbTeamsBridge.getSnapshotByTeamKey(teamName).ifPresent(snap ->
+                    data.ensureTeamForExternalKey(snap.teamKey(), snap.displayName(), snap.ownerId()));
+            leader = data.getTeamLeader(teamName);
+        }
+        return leader;
     }
 
     public boolean addTeamCurrency(String teamName, String currencyId, double amount) {
@@ -514,6 +542,18 @@ public class ShopTeamManager {
 
         public String getPlayerTeam(UUID player) {
             return playerTeams.get(player);
+        }
+
+        public void setPlayerTeam(UUID player, String teamName) {
+            if (player == null) {
+                return;
+            }
+            if (teamName == null || teamName.isBlank()) {
+                playerTeams.remove(player);
+            } else {
+                playerTeams.put(player, teamName);
+            }
+            setDirty();
         }
 
         public List<UUID> getTeamMembers(String teamName) {

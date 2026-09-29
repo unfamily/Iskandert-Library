@@ -79,6 +79,70 @@ public record LiquidTypeProperties(
             260,
             1000);
 
+    /**
+     * When {@code loggable} is requested and waterlogging is not applied as block state,
+     * hydrate / boating defaults match water-like behaviour.
+     */
+    public LiquidTypeProperties withLoggableDefaults() {
+        return new LiquidTypeProperties(
+                motionScale, canPushEntity, canSwim, canDrown, fallDistanceModifier, canExtinguish,
+                canConvertToSource, true, true, pathType, adjacentPathType, rarity, density, temperature, viscosity);
+    }
+
+    public LiquidTypeProperties withCanConvertToSource(boolean value) {
+        return new LiquidTypeProperties(
+                motionScale, canPushEntity, canSwim, canDrown, fallDistanceModifier, canExtinguish,
+                value, supportsBoating, canHydrate, pathType, adjacentPathType, rarity, density, temperature, viscosity);
+    }
+
+    public LiquidTypeProperties withSupportsBoating(boolean value) {
+        return new LiquidTypeProperties(
+                motionScale, canPushEntity, canSwim, canDrown, fallDistanceModifier, canExtinguish,
+                canConvertToSource, value, canHydrate, pathType, adjacentPathType, rarity, density, temperature, viscosity);
+    }
+
+    public LiquidTypeProperties withCanHydrate(boolean value) {
+        return new LiquidTypeProperties(
+                motionScale, canPushEntity, canSwim, canDrown, fallDistanceModifier, canExtinguish,
+                canConvertToSource, supportsBoating, value, pathType, adjacentPathType, rarity, density, temperature, viscosity);
+    }
+
+    public LiquidTypeProperties withTemperature(int temperature) {
+        return new LiquidTypeProperties(
+                motionScale, canPushEntity, canSwim, canDrown, fallDistanceModifier, canExtinguish,
+                canConvertToSource, supportsBoating, canHydrate, pathType, adjacentPathType, rarity, density, temperature, viscosity);
+    }
+
+    public LiquidTypeProperties withViscosity(int viscosity) {
+        return new LiquidTypeProperties(
+                motionScale, canPushEntity, canSwim, canDrown, fallDistanceModifier, canExtinguish,
+                canConvertToSource, supportsBoating, canHydrate, pathType, adjacentPathType, rarity, density, temperature, viscosity);
+    }
+
+    public LiquidTypeProperties withDensity(int density) {
+        return new LiquidTypeProperties(
+                motionScale, canPushEntity, canSwim, canDrown, fallDistanceModifier, canExtinguish,
+                canConvertToSource, supportsBoating, canHydrate, pathType, adjacentPathType, rarity, density, temperature, viscosity);
+    }
+
+    public LiquidTypeProperties withCanSwim(boolean value) {
+        return new LiquidTypeProperties(
+                motionScale, canPushEntity, value, canDrown, fallDistanceModifier, canExtinguish,
+                canConvertToSource, supportsBoating, canHydrate, pathType, adjacentPathType, rarity, density, temperature, viscosity);
+    }
+
+    public LiquidTypeProperties withCanDrown(boolean value) {
+        return new LiquidTypeProperties(
+                motionScale, canPushEntity, canSwim, value, fallDistanceModifier, canExtinguish,
+                canConvertToSource, supportsBoating, canHydrate, pathType, adjacentPathType, rarity, density, temperature, viscosity);
+    }
+
+    public LiquidTypeProperties withCanExtinguish(boolean value) {
+        return new LiquidTypeProperties(
+                motionScale, canPushEntity, canSwim, canDrown, fallDistanceModifier, value,
+                canConvertToSource, supportsBoating, canHydrate, pathType, adjacentPathType, rarity, density, temperature, viscosity);
+    }
+
     FluidType.Properties build(String descriptionId, int lightLevel, LiquidSoundSet sounds) {
         FluidType.Properties props = FluidType.Properties.create()
                 .descriptionId(descriptionId)
