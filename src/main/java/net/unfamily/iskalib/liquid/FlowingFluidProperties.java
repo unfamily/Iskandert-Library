@@ -23,4 +23,20 @@ public record FlowingFluidProperties(
                 .levelDecreasePerBlock(levelDecreasePerBlock)
                 .explosionResistance(explosionResistance);
     }
+
+    public FlowingFluidProperties withTickRate(int tickRate) {
+        return new FlowingFluidProperties(tickRate, slopeFindDistance, levelDecreasePerBlock, explosionResistance);
+    }
+
+    public FlowingFluidProperties withSlopeFindDistance(int slopeFindDistance) {
+        return new FlowingFluidProperties(tickRate, slopeFindDistance, levelDecreasePerBlock, explosionResistance);
+    }
+
+    public FlowingFluidProperties withLevelDecreasePerBlock(int levelDecreasePerBlock) {
+        return new FlowingFluidProperties(tickRate, slopeFindDistance, levelDecreasePerBlock, explosionResistance);
+    }
+
+    public FlowingFluidProperties withExplosionResistance(float explosionResistance) {
+        return new FlowingFluidProperties(tickRate, slopeFindDistance, levelDecreasePerBlock, explosionResistance);
+    }
 }

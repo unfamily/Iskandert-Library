@@ -76,6 +76,8 @@ dependencies {
     localRuntime 'curse.maven:ftb-library-forge-404465:8569579'
     compileOnly 'dev.ftb.mods:ftb-quests-neoforge:2101.1.34'
     localRuntime 'dev.ftb.mods:ftb-quests-neoforge:2101.1.34'
+    compileOnly 'dev.ftb.mods:ftb-ultimine-neoforge:2101.1.14'
+    localRuntime 'dev.ftb.mods:ftb-ultimine-neoforge:2101.1.14'
 }
 
 var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {

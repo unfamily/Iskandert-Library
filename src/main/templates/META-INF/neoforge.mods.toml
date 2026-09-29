@@ -7,11 +7,14 @@ license="${mod_license}"
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
-logoFile="iska_lib/assets/textures/logo.png"
+logoFile="logo.png"
 authors="${mod_authors}"
 description='''
 ${mod_description}
 '''
+
+[modproperties.${mod_id}]
+another_config_manager=true
 
 [[mixins]]
 config="${mod_id}.mixins.json"
@@ -47,4 +50,24 @@ config="${mod_id}.mixins.json"
     modId="ftbquests"
     type="optional"
     ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="ftbultimine"
+    type="optional"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="configured"
+    type="optional"
+    versionRange="[0,)"
+    ordering="NONE"
+    side="CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId="another_config_manager"
+    type="required"
+    versionRange="[1.0.0.0.0,)"
+    ordering="NONE"
     side="BOTH"

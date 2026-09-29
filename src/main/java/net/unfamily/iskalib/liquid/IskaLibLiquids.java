@@ -96,6 +96,12 @@ public final class IskaLibLiquids {
                 throw new IllegalArgumentException("LiquidSpec modId " + spec.modId() + " does not match registration modId " + modId);
             }
 
+            LiquidTypeProperties typeProperties = spec.typeProperties();
+            if (spec.blockProperties().loggable()) {
+                typeProperties = typeProperties.withLoggableDefaults();
+            }
+            LiquidTypeProperties finalTypeProperties = typeProperties;
+
             var refs = new Object() {
                 DeferredHolder<FluidType, FluidType> fluidType;
                 DeferredHolder<Fluid, BaseFlowingFluid.Source> source;
@@ -105,7 +111,7 @@ public final class IskaLibLiquids {
             };
 
             refs.fluidType = fluidTypes.register(spec.fluidSourceId() + "_type", () -> new FluidType(
-                    spec.typeProperties().build(spec.descriptionId(), spec.lightLevel(), spec.sounds())));
+                    finalTypeProperties.build(spec.descriptionId(), spec.lightLevel(), spec.sounds())));
 
             BaseFlowingFluid.Properties fluidProps = new BaseFlowingFluid.Properties(
                     refs.fluidType,
@@ -122,9 +128,21 @@ public final class IskaLibLiquids {
             ResourceLocation blockId = ResourceLocation.fromNamespaceAndPath(modId, spec.blockId());
             ResourceLocation bucketId = ResourceLocation.fromNamespaceAndPath(modId, spec.bucketId());
 
-            refs.block = blocks.register(spec.blockId(), () -> spec.blockProperties().createBlock(
-                    refs.flowing.get(),
-                    spec.blockProperties().toBlockProperties(spec.lightLevel())));
+            LiquidBlockProperties blockProps = spec.blockProperties();
+            LiquidBlockFactory factory = blockProps.blockFactory();
+            if (factory == null && spec.hasDimensionTicks()) {
+                List<DimensionTickTransform> transforms = spec.dimensionTicks();
+                factory = (flowing, props) -> new DimensionTickLiquidBlock(flowing, props, sourceFluidId, transforms);
+            }
+            LiquidBlockFactory finalFactory = factory;
+
+            refs.block = blocks.register(spec.blockId(), () -> {
+                var props = blockProps.toBlockProperties(spec.lightLevel());
+                if (finalFactory != null) {
+                    return finalFactory.create(refs.flowing.get(), props);
+                }
+                return blockProps.createBlock(refs.flowing.get(), props);
+            });
 
             if (spec.registerBucket()) {
                 refs.bucket = items.register(spec.bucketId(), () -> new net.minecraft.world.item.BucketItem(
@@ -145,6 +163,12 @@ public final class IskaLibLiquids {
 
             registered.add(liquid);
             LiquidRegistry.register(liquid);
+
+            LiquidBehaviorRegistry.put(sourceFluidId, new LiquidBehaviorRegistry.Overlay(
+                    finalTypeProperties.canConvertToSource(),
+                    blockProps.loggable(),
+                    spec.dimensionTicks()));
+
             return liquid;
         }
 

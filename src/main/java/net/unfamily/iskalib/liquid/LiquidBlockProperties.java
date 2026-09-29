@@ -9,16 +9,28 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Liquid block registration properties (separate from fluid-type light level when needed).
+ * {@code loggable} stores water-like fluidlog / hydrate intent.
  */
 public record LiquidBlockProperties(
         MapColor mapColor,
         float strength,
         PushReaction pushReaction,
         int blockLightLevel,
-        @Nullable LiquidBlockFactory blockFactory
+        @Nullable LiquidBlockFactory blockFactory,
+        boolean loggable
 ) {
     public static final LiquidBlockProperties STANDARD = new LiquidBlockProperties(
-            MapColor.COLOR_GRAY, 100.0F, PushReaction.DESTROY, -1, null);
+            MapColor.COLOR_GRAY, 100.0F, PushReaction.DESTROY, -1, null, false);
+
+    public LiquidBlockProperties(
+            MapColor mapColor,
+            float strength,
+            PushReaction pushReaction,
+            int blockLightLevel,
+            @Nullable LiquidBlockFactory blockFactory
+    ) {
+        this(mapColor, strength, pushReaction, blockLightLevel, blockFactory, false);
+    }
 
     public BlockBehaviour.Properties toBlockProperties(int fluidTypeLightLevel) {
         int light = blockLightLevel >= 0 ? blockLightLevel : fluidTypeLightLevel;
@@ -40,10 +52,14 @@ public record LiquidBlockProperties(
     }
 
     public LiquidBlockProperties withBlockFactory(LiquidBlockFactory factory) {
-        return new LiquidBlockProperties(mapColor, strength, pushReaction, blockLightLevel, factory);
+        return new LiquidBlockProperties(mapColor, strength, pushReaction, blockLightLevel, factory, loggable);
     }
 
     public LiquidBlockProperties withBlockLightLevel(int light) {
-        return new LiquidBlockProperties(mapColor, strength, pushReaction, light, blockFactory);
+        return new LiquidBlockProperties(mapColor, strength, pushReaction, light, blockFactory, loggable);
+    }
+
+    public LiquidBlockProperties withLoggable(boolean loggable) {
+        return new LiquidBlockProperties(mapColor, strength, pushReaction, blockLightLevel, blockFactory, loggable);
     }
 }

@@ -17,6 +17,7 @@ import net.unfamily.iskalib.client.marker.VanillaWorldMarkerClientHooks;
 import net.unfamily.iskalib.explosion.ExplosionSystem;
 import net.unfamily.iskalib.gas.IskaLibGases;
 import net.unfamily.iskalib.liquid.IskaLibLiquids;
+import net.unfamily.iskalib.liquid.LiquidJsonLoader;
 import net.unfamily.iskalib.shop.ShopCurrencyCatalog;
 
 //change_hash
@@ -35,8 +36,18 @@ public class IskaLib {
                 LOGGER.error("Failed to initialize FTB Quests integration", t);
             }
         }
+        if (ModList.get().isLoaded("ftbultimine")) {
+            try {
+                Class.forName("net.unfamily.iskalib.integration.ftbultimine.FtbUltimineIntegration")
+                        .getMethod("init")
+                        .invoke(null);
+            } catch (Throwable error) {
+                LOGGER.error("Failed to initialize FTB Ultimine integration", error);
+            }
+        }
         IskaLibGases.initLibrary(modEventBus);
         IskaLibLiquids.initLibrary(modEventBus);
+        LiquidJsonLoader.bootstrapFromJar();
         modEventBus.addListener(IskaLibGases::registerCapabilities);
         NeoForge.EVENT_BUS.register(ExplosionSystem.class);
         ShopCurrencyCatalog.bootstrapFromJar();
@@ -55,7 +66,6 @@ public class IskaLib {
             if (!net.neoforged.fml.ModList.get().isLoaded("ftbteams")) {
                 return;
             }
-            // Optional integration: do not load FtbTeamsEvents unless ftbteams is present (compileOnly API).
             try {
                 Class<?> events = Class.forName("net.unfamily.iskalib.integration.ftbteams.FtbTeamsEvents");
                 events.getMethod("init").invoke(null);
@@ -74,4 +84,3 @@ public class IskaLib {
         }
     }
 }
-

@@ -13,9 +13,11 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.server.level.ServerPlayer;
 import net.unfamily.iskalib.debug.HandItemDump;
 import net.unfamily.iskalib.reload.UtilsReloadHooks;
+import net.unfamily.iskalib.stage.StageReloadHooks;
 
 /**
- * Library debug commands. Root {@code iska_lib_debug}: {@code hand}, {@code reload}, {@code wiki}.
+ * Library developer commands. Root {@code iska_lib_dev}: {@code hand}, {@code reload}, {@code wiki}.
+ * 
  */
 public final class IskaLibDebugCommand {
 
@@ -24,13 +26,15 @@ public final class IskaLibDebugCommand {
     private IskaLibDebugCommand() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("iska_lib_debug")
+        dispatcher.register(Commands.literal("iska_lib_dev")
                 .requires(source -> source.hasPermission(0))
                 .then(Commands.literal("hand")
                         .executes(IskaLibDebugCommand::executeHand))
                 .then(Commands.literal("reload")
                         .requires(source -> source.hasPermission(2))
-                        .executes(IskaLibDebugCommand::executeReload))
+                        .executes(IskaLibDebugCommand::executeReload)
+                        .then(Commands.literal("stages")
+                                .executes(IskaLibDebugCommand::executeReloadStages)))
                 .then(Commands.literal("wiki")
                         .executes(IskaLibDebugCommand::executeWiki)));
     }
@@ -52,6 +56,21 @@ public final class IskaLibDebugCommand {
             return 0;
         }
         return listener.reloadFromDatapacks(source);
+    }
+
+    private static int executeReloadStages(CommandContext<CommandSourceStack> context) {
+        StageReloadHooks.Listener listener = StageReloadHooks.getListener();
+        if (listener == null) {
+            context.getSource().sendFailure(Component.translatable("commands.iska_lib.stage.reload.unavailable"));
+            return 0;
+        }
+        int result = listener.reloadStageBlock(context.getSource());
+        if (result > 0) {
+            context.getSource().sendSuccess(
+                    () -> Component.translatable("commands.iska_lib.stage.reload.success"),
+                    true);
+        }
+        return result;
     }
 
     private static int executeWiki(CommandContext<CommandSourceStack> context) {

@@ -6,5 +6,6 @@
   "mixins": [
     "CauldronFluidContentMixin"
   ],
+  "client": [],
   "minVersion": "0.8"
 }
