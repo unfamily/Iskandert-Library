@@ -80,12 +80,14 @@ public record LiquidTypeProperties(
             1000);
 
     /**
-     * When {@code loggable} is requested and waterlogging is not applied as block state,
-     * hydrate / boating defaults match water-like behaviour.
+     * When {@code loggable} is set on fluid JSON: water-like FluidType behaviour
+     * (hydrate, boating, extinguish). Vanilla {@code SimpleWaterloggedBlock} only stores
+     * {@link net.minecraft.world.level.material.Fluids#WATER}, so custom fluids cannot
+     * occupy the WATERLOGGED blockstate; this is the supported “loggable” contract.
      */
     public LiquidTypeProperties withLoggableDefaults() {
         return new LiquidTypeProperties(
-                motionScale, canPushEntity, canSwim, canDrown, fallDistanceModifier, canExtinguish,
+                motionScale, canPushEntity, canSwim, canDrown, fallDistanceModifier, true,
                 canConvertToSource, true, true, pathType, adjacentPathType, rarity, density, temperature, viscosity);
     }
 
