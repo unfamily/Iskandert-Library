@@ -9,7 +9,9 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Liquid block registration properties (separate from fluid-type light level when needed).
- * {@code loggable} stores water-like fluidlog / hydrate intent; full waterlogging is not forced on NF26.
+ * {@code loggable} marks water-like hydrate / boating / extinguish intent on the FluidType.
+ * Custom fluids cannot use vanilla WATERLOGGED blockstate (water-only); see
+ * {@link LiquidTypeProperties#withLoggableDefaults()}.
  */
 public record LiquidBlockProperties(
         MapColor mapColor,
