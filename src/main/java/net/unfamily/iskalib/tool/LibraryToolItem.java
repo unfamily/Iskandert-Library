@@ -4,10 +4,12 @@ import net.minecraft.core.HolderGetter;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.Unit;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ToolMaterial;
 import net.minecraft.world.item.component.Tool;
 import net.minecraft.world.level.block.Block;
@@ -28,20 +30,45 @@ public final class LibraryToolItem extends Item {
     }
 
     public static Item.Properties baseProperties(ToolBehaviorDefinition def) {
-        ToolMaterial material = ToolMaterial.IRON;
-        Item.Properties props = switch (def.behavior()) {
-            case LUMBERJACK -> material.applyToolProperties(
-                    new Item.Properties(), BlockTags.MINEABLE_WITH_AXE, 6.0F, -3.1F, 0.0F);
-            case SCYTHE -> material.applyToolProperties(
-                    new Item.Properties(), BlockTags.MINEABLE_WITH_HOE, 0.0F, -1.0F, 0.0F);
-            case EXCAVATOR -> material.applyToolProperties(
-                    new Item.Properties(), BlockTags.MINEABLE_WITH_PICKAXE, 1.0F, -2.8F, 0.0F);
-            case PAXEL -> material.applyToolProperties(
-                    new Item.Properties(), BlockTags.MINEABLE_WITH_PICKAXE, 1.0F, -2.8F, 0.0F);
+        LibraryToolStats.Resolved stats = def.stats().resolve(def.behavior());
+        TagKey<Item> repair = stats.repairTag() != null ? stats.repairTag() : ItemTags.IRON_TOOL_MATERIALS;
+        ToolMaterial material = new ToolMaterial(
+                stats.incorrectForDrops(),
+                stats.materialDurability(),
+                stats.miningSpeed(),
+                stats.attackDamageBonus(),
+                stats.enchantability(),
+                repair);
+
+        TagKey<Block> mineable = switch (def.behavior()) {
+            case LUMBERJACK -> BlockTags.MINEABLE_WITH_AXE;
+            case SCYTHE -> BlockTags.MINEABLE_WITH_HOE;
+            case EXCAVATOR, PAXEL -> BlockTags.MINEABLE_WITH_PICKAXE;
         };
+
+        Item.Properties props = material.applyToolProperties(
+                new Item.Properties(),
+                mineable,
+                stats.attackDamageBaseline(),
+                stats.attackSpeed(),
+                stats.disableBlockingSeconds());
 
         if (def.behavior() == ToolBehaviorType.PAXEL || def.behavior() == ToolBehaviorType.EXCAVATOR) {
             props.component(DataComponents.TOOL, createMultiMineTool(def.behavior(), material));
+        }
+
+        if (stats.repairItem() != null) {
+            Item repairItem = BuiltInRegistries.ITEM.getValue(stats.repairItem());
+            if (repairItem != null && repairItem != Items.AIR) {
+                props.repairable(repairItem);
+            }
+        }
+
+        if (stats.fireResistant()) {
+            props.fireResistant();
+        }
+        if (stats.rarity() != null) {
+            props.rarity(stats.rarity());
         }
 
         int durability = def.durability();
@@ -83,7 +110,6 @@ public final class LibraryToolItem extends Item {
 
     @Override
     public boolean canPerformAction(ItemInstance stack, ItemAbility ability) {
-        // Dig is driven by DataComponents.TOOL; only axe/shovel/hoe extras here (same as Utils paxel).
         return switch (behavior) {
             case LUMBERJACK -> ItemAbilities.DEFAULT_AXE_ACTIONS.contains(ability);
             case SCYTHE -> ItemAbilities.DEFAULT_HOE_ACTIONS.contains(ability);

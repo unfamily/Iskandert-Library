@@ -49,7 +49,6 @@ public final class IskaLibTools {
                 props -> LibraryToolItem.create(def, props),
                 props -> LibraryToolItem.baseProperties(def));
         BY_ID.put(id, holder);
-        LibraryToolGeneratedAssets.writePlaceholderAssets(path);
         LOGGER.info("Registered Library tool item {}", id);
     }
 }

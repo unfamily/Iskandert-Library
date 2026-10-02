@@ -170,7 +170,8 @@ public final class ToolBehaviorLoader {
                     ? json.get("durability").getAsInt()
                     : ToolBehaviorDefinition.DURABILITY_VANILLA;
             List<TagKey<Block>> tags = parseHarvestTags(json);
-            ToolBehaviorDefinition def = new ToolBehaviorDefinition(itemId, behavior, range, tags, durability);
+            LibraryToolStats stats = parseToolStats(json);
+            ToolBehaviorDefinition def = new ToolBehaviorDefinition(itemId, behavior, range, tags, durability, stats);
 
             if (registerItems) {
                 IskaLibTools.registerLibraryTool(def);
@@ -220,6 +221,85 @@ public final class ToolBehaviorLoader {
             tags.add(TagKey.create(Registries.BLOCK, tagId));
         }
         return tags;
+    }
+
+    private static LibraryToolStats parseToolStats(JsonObject json) {
+        Float miningSpeed = optionalFloat(json, "mining_speed");
+        Float attackDamage = optionalFloat(json, "attack_damage");
+        Float attackSpeed = optionalFloat(json, "attack_speed");
+        Integer enchantability = optionalInt(json, "enchantability");
+        Float disableBlocking = optionalFloat(json, "disable_blocking");
+        boolean fireResistant = json.has("fire_resistant")
+                && json.get("fire_resistant").isJsonPrimitive()
+                && json.get("fire_resistant").getAsBoolean();
+        net.minecraft.world.item.Rarity rarity = parseRarity(optionalString(json, "rarity"));
+
+        TagKey<Block> incorrect = null;
+        String incorrectRaw = optionalString(json, "incorrect_for_drops");
+        if (incorrectRaw != null) {
+            Identifier id = incorrectRaw.startsWith("#")
+                    ? Identifier.parse(incorrectRaw.substring(1))
+                    : Identifier.parse(incorrectRaw);
+            incorrect = TagKey.create(Registries.BLOCK, id);
+        }
+
+        TagKey<net.minecraft.world.item.Item> repairTag = null;
+        Identifier repairItem = null;
+        String repairRaw = optionalString(json, "repair");
+        if (repairRaw != null) {
+            if (repairRaw.startsWith("#")) {
+                repairTag = TagKey.create(Registries.ITEM, Identifier.parse(repairRaw.substring(1)));
+            } else {
+                repairItem = Identifier.parse(repairRaw);
+            }
+        }
+
+        return new LibraryToolStats(
+                miningSpeed,
+                attackDamage,
+                attackSpeed,
+                enchantability,
+                incorrect,
+                repairTag,
+                repairItem,
+                disableBlocking,
+                fireResistant,
+                rarity);
+    }
+
+    private static net.minecraft.world.item.Rarity parseRarity(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        return switch (raw.trim().toLowerCase()) {
+            case "common" -> net.minecraft.world.item.Rarity.COMMON;
+            case "uncommon" -> net.minecraft.world.item.Rarity.UNCOMMON;
+            case "rare" -> net.minecraft.world.item.Rarity.RARE;
+            case "epic" -> net.minecraft.world.item.Rarity.EPIC;
+            default -> throw new IllegalArgumentException("unknown rarity: " + raw);
+        };
+    }
+
+    private static String optionalString(JsonObject json, String field) {
+        if (!json.has(field) || !json.get(field).isJsonPrimitive()) {
+            return null;
+        }
+        String value = json.get(field).getAsString();
+        return value.isBlank() ? null : value;
+    }
+
+    private static Float optionalFloat(JsonObject json, String field) {
+        if (!json.has(field) || !json.get(field).isJsonPrimitive()) {
+            return null;
+        }
+        return json.get(field).getAsFloat();
+    }
+
+    private static Integer optionalInt(JsonObject json, String field) {
+        if (!json.has(field) || !json.get(field).isJsonPrimitive()) {
+            return null;
+        }
+        return json.get(field).getAsInt();
     }
 
     private static String requiredString(JsonObject json, String field) {
