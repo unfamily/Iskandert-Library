@@ -1,6 +1,7 @@
 package net.unfamily.iskalib.client;
 
 import net.neoforged.bus.api.IEventBus;
+import net.unfamily.iskalib.client.gas.IskaLibGasAssetPack;
 import net.unfamily.iskalib.client.gas.IskaLibGasBlockModels;
 import net.unfamily.iskalib.client.gas.IskaLibGasFluidModels;
 import net.unfamily.iskalib.client.liquid.IskaLibLiquidFluidModels;
@@ -20,6 +21,7 @@ public final class IskaLibConsumerClientHooks {
         }
         modEventBus.addListener(IskaLibGasFluidModels::registerFluidModels);
         modEventBus.addListener(IskaLibGasBlockModels::registerBlockTintSources);
+        modEventBus.addListener(IskaLibGasAssetPack::onAddPackFinders);
         modEventBus.addListener(IskaLibLiquidFluidModels::registerFluidModels);
     }
 

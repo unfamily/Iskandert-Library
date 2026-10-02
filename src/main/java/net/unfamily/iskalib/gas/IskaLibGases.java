@@ -187,6 +187,8 @@ public final class IskaLibGases {
             registered.add(gas);
             GasRegistry.register(gas);
 
+            LibraryGasGeneratedAssets.writeBlockstate(modId, spec.blockId());
+
             // Seed overlay so datapack dimension_ticks can refine without re-registering the fluid.
             LiquidBehaviorRegistry.put(sourceFluidId, new LiquidBehaviorRegistry.Overlay(
                     null, null, spec.dimensionTicks()));
