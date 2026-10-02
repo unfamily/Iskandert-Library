@@ -1,28 +1,46 @@
 package net.unfamily.iskalib.client.tool;
 
-import net.minecraft.client.resources.model.BakedModel;
-import net.minecraft.client.resources.model.ModelResourceLocation;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.Item;
-import net.neoforged.neoforge.client.event.ModelEvent;
-import net.neoforged.neoforge.registries.DeferredItem;
-import net.unfamily.iskalib.tool.IskaLibTools;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.PackSelectionConfig;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.PathPackResources;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackSource;
+import net.neoforged.neoforge.event.AddPackFindersEvent;
+import net.unfamily.iskalib.tool.LibraryToolGeneratedAssets;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Optional;
 
 /**
- * Maps dynamic Library tool items to the iron pickaxe baked model (no per-id asset required).
+ * Exposes {@link LibraryToolGeneratedAssets} as a built-in client resource pack (26+ items/ defs).
  */
 public final class IskaLibToolItemModels {
+    private static final String PACK_ID = "iska_lib/generated_tools";
+
     private IskaLibToolItemModels() {}
 
-    public static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
-        BakedModel pick = event.getModels().get(
-                ModelResourceLocation.inventory(Identifier.withDefaultNamespace("iron_pickaxe")));
-        if (pick == null) {
+    public static void onAddPackFinders(AddPackFindersEvent event) {
+        if (event.getPackType() != PackType.CLIENT_RESOURCES) {
             return;
         }
-        for (DeferredItem<Item> tool : IskaLibTools.allItems()) {
-            ModelResourceLocation key = ModelResourceLocation.inventory(tool.getId());
-            event.getModels().put(key, pick);
+        Path root = LibraryToolGeneratedAssets.assetsRoot();
+        if (!Files.isDirectory(root)) {
+            return;
+        }
+        Pack pack = Pack.readMetaAndCreate(
+                new PackLocationInfo(
+                        PACK_ID,
+                        Component.literal("IskaLib Generated Tools"),
+                        PackSource.BUILT_IN,
+                        Optional.empty()),
+                new PathPackResources.PathResourcesSupplier(root),
+                PackType.CLIENT_RESOURCES,
+                new PackSelectionConfig(true, Pack.Position.TOP, false));
+        if (pack != null) {
+            event.addRepositorySource(consumer -> consumer.accept(pack));
         }
     }
 }

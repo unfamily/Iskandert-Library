@@ -47,8 +47,9 @@ public final class IskaLibTools {
         DeferredItem<Item> holder = IskaLibOwnedLiquidRegisters.ITEMS.registerItem(
                 path,
                 props -> LibraryToolItem.create(def, props),
-                LibraryToolItem.baseProperties(def));
+                props -> LibraryToolItem.baseProperties(def));
         BY_ID.put(id, holder);
+        LibraryToolGeneratedAssets.writePlaceholderAssets(path);
         LOGGER.info("Registered Library tool item {}", id);
     }
 }

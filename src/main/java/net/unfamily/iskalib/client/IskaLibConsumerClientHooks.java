@@ -22,7 +22,7 @@ public final class IskaLibConsumerClientHooks {
         modEventBus.addListener(IskaLibGasFluidModels::registerFluidModels);
         modEventBus.addListener(IskaLibGasBlockModels::registerBlockTintSources);
         modEventBus.addListener(IskaLibLiquidFluidModels::registerFluidModels);
-        modEventBus.addListener(IskaLibToolItemModels::onModifyBakingResult);
+        modEventBus.addListener(IskaLibToolItemModels::onAddPackFinders);
     }
 
     private static boolean isPhysicalClient() {
