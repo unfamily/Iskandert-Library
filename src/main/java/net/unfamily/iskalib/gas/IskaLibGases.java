@@ -183,6 +183,8 @@ public final class IskaLibGases {
             registered.add(gas);
             GasRegistry.register(gas);
 
+            LibraryGasGeneratedAssets.writeBlockstate(modId, spec.blockId());
+
             LiquidBehaviorRegistry.put(sourceFluidId, new LiquidBehaviorRegistry.Overlay(
                     null, null, spec.dimensionTicks()));
 
