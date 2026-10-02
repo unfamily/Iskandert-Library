@@ -77,6 +77,11 @@ public final class IskaLibFluidClient {
                 public int getTintColor(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
                     return 0x00000000; // alpha=0 → fluid mesh invisible in world
                 }
+
+                @Override
+                public ResourceLocation getRenderOverlayTexture(net.minecraft.client.Minecraft mc) {
+                    return null; // no water/liquid screen overlay inside gas
+                }
             }, gas.fluidTypeHolder().get());
         }
 
@@ -119,16 +124,10 @@ public final class IskaLibFluidClient {
 
     public static void registerBlockColors(RegisterColorHandlersEvent.Block event) {
         for (RegisteredGas gas : GasRegistry.all()) {
-            if (!gas.blockHolder().isBound()) {
-                continue;
-            }
             int tint = gas.tintArgb();
             event.register((state, level, pos, index) -> tint, gas.block());
         }
         for (RegisteredLiquid liquid : IskaLibLiquids.allRegisteredLiquids()) {
-            if (!liquid.blockHolder().isBound()) {
-                continue;
-            }
             int tint = liquid.tintArgb();
             event.register((state, level, pos, index) -> tint, liquid.block());
         }

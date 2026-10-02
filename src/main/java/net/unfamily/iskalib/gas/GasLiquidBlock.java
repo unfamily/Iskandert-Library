@@ -27,6 +27,7 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.AABB;
@@ -34,6 +35,8 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.unfamily.iskalib.liquid.DimensionTickTransform;
 import net.unfamily.iskalib.liquid.LiquidBehaviorRegistry;
 import org.jetbrains.annotations.Nullable;
@@ -100,6 +103,18 @@ public class GasLiquidBlock extends LiquidBlock {
     @Override
     protected RenderShape getRenderShape(BlockState state) {
         return RenderShape.MODEL;
+    }
+
+    /**
+     * Client-only empty fluid: suppresses vanilla fluid chunk mesh so only the gas block model draws.
+     * Server keeps the real fluid for logic, extraction, and sync.
+     */
+    @Override
+    public FluidState getFluidState(BlockState state) {
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            return Fluids.EMPTY.defaultFluidState();
+        }
+        return super.getFluidState(state);
     }
 
     @Override
@@ -177,7 +192,7 @@ public class GasLiquidBlock extends LiquidBlock {
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
             return true;
         }
-        FluidState fluidState = level.getFluidState(pos);
+        FluidState fluidState = super.getFluidState(state);
         if (state.getValue(LEVEL) != 0
                 || !fluidState.isSource()
                 || fluidState.getType() != registered.sourceFluid()) {
