@@ -40,6 +40,7 @@ public class IskaLib {
         IskaLibCreativeTabs.registerIfNeeded(modEventBus);
         StageBootstrap.install();
         NeoForge.EVENT_BUS.register(ExplosionSystem.class);
+        NeoForge.EVENT_BUS.register(net.unfamily.iskalib.crafting.RecipeBundleSplitHooks.class);
         ShopCurrencyCatalog.bootstrapFromJar();
         ShopCurrencyCatalog.installAsDefaultListener();
         if (ModList.get().isLoaded("ftbquests")) {
