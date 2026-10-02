@@ -9,7 +9,7 @@ import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import net.unfamily.iskalib.IskaLib;
 
 /**
- * Library-owned deferred registers for fluids declared under {@code data/iska_lib/iska_lib/liquids/}.
+ * Library-owned deferred registers for fluids/gases declared under {@code data/iska_lib/iska_lib/liquids|gases/}.
  */
 public final class IskaLibOwnedLiquidRegisters {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(IskaLib.MOD_ID);
@@ -25,6 +25,10 @@ public final class IskaLibOwnedLiquidRegisters {
 
     public static LiquidRegistrationRegisters asLiquidRegisters() {
         return new LiquidRegistrationRegisters(FLUID_TYPES, FLUIDS, BLOCKS, ITEMS);
+    }
+
+    public static net.unfamily.iskalib.gas.GasRegistrationRegisters asGasRegisters() {
+        return new net.unfamily.iskalib.gas.GasRegistrationRegisters(FLUID_TYPES, FLUIDS, BLOCKS, ITEMS);
     }
 
     public static void register(IEventBus modEventBus) {

@@ -12,6 +12,10 @@ import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
+import net.unfamily.iskalib.IskaLib;
+import net.unfamily.iskalib.liquid.IskaLibOwnedLiquidRegisters;
+import net.unfamily.iskalib.liquid.LiquidBehaviorRegistry;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,11 +32,13 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class IskaLibGases {
     private static final Map<String, ModGasRegistration> BY_MOD = new ConcurrentHashMap<>();
     private static boolean interactionsInitialized;
+    private static IEventBus libraryModEventBus;
 
     private IskaLibGases() {}
 
     /** Called from {@link net.unfamily.iskalib.IskaLib} to wire global interaction handlers. */
     public static void initLibrary(IEventBus iskaLibModEventBus) {
+        libraryModEventBus = iskaLibModEventBus;
         ensureInteractions(iskaLibModEventBus);
     }
 
@@ -58,6 +64,32 @@ public final class IskaLibGases {
         hookClientEventsOnce(modEventBus);
         ModGasRegistration reg = BY_MOD.computeIfAbsent(spec.modId(), id -> new ModGasRegistration(registers));
         return reg.register(spec);
+    }
+
+    /**
+     * Registers a gas owned by {@code iska_lib} using Library deferred registers.
+     * Used by {@link GasJsonLoader} for jar-scoped JSON gases.
+     */
+    public static RegisteredGas registerLibraryGas(GasSpec spec) {
+        if (libraryModEventBus == null) {
+            throw new IllegalStateException("IskaLibGases.initLibrary must run before registerLibraryGas");
+        }
+        if (!IskaLib.MOD_ID.equals(spec.modId())) {
+            throw new IllegalArgumentException("Library-owned gases must use modId " + IskaLib.MOD_ID + ", got " + spec.modId());
+        }
+        return registerGas(libraryModEventBus, IskaLibOwnedLiquidRegisters.asGasRegisters(), spec);
+    }
+
+    public static boolean isRegistered(ResourceLocation fluidId) {
+        if (fluidId == null) {
+            return false;
+        }
+        for (RegisteredGas gas : allRegisteredGases()) {
+            if (fluidId.equals(gas.sourceFluidId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void ensureInteractions(IEventBus iskaLibModEventBus) {
@@ -150,6 +182,10 @@ public final class IskaLibGases {
 
             registered.add(gas);
             GasRegistry.register(gas);
+
+            LiquidBehaviorRegistry.put(sourceFluidId, new LiquidBehaviorRegistry.Overlay(
+                    null, null, spec.dimensionTicks()));
+
             return gas;
         }
 
@@ -158,7 +194,7 @@ public final class IskaLibGases {
         }
     }
 
-    static List<RegisteredGas> allRegisteredGases() {
+    public static List<RegisteredGas> allRegisteredGases() {
         List<RegisteredGas> out = new ArrayList<>();
         for (ModGasRegistration reg : BY_MOD.values()) {
             out.addAll(reg.registeredGases());

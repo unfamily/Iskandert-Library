@@ -22,6 +22,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * Public API: consumer mods register normal liquids on their mod event bus.
  * Mirrors {@link net.unfamily.iskalib.gas.IskaLibGases} and Colossal Reactors {@code ModFluids.registerTintedFluid}.
  * <p>
+ * {@link LiquidSpec#modId()} must be the <strong>hosting mod</strong> id (the consumer that owns the
+ * DeferredRegisters), not {@code iska_lib}, unless you are registering a Library-owned liquid via
+ * {@link #registerLibraryLiquid}.
+ * <p>
  * Pass the consumer's existing {@link DeferredRegister} instances via {@link LiquidRegistrationRegisters}.
  * Runtime infinity / loggable / dimension-tick overlays come from {@link LiquidBehaviorRegistry}
  * (see {@link OverlayAwareFluidType} and {@link DimensionTickLiquidBlock}).
@@ -97,6 +101,10 @@ public final class IskaLibLiquids {
         return registerLiquid(modEventBus, registers, new LiquidSpec(modId, name, tintArgb, descriptionId, lightLevel));
     }
 
+    /**
+     * Registers a consumer-owned liquid. {@code spec.modId()} must match {@code registers} namespace
+     * (hosting mod), not {@code iska_lib}.
+     */
     public static RegisteredLiquid registerLiquid(IEventBus modEventBus, LiquidRegistrationRegisters registers, LiquidSpec spec) {
         hookClientEventsOnce(modEventBus);
         ModLiquidRegistration reg = BY_MOD.computeIfAbsent(spec.modId(), id -> new ModLiquidRegistration(registers));

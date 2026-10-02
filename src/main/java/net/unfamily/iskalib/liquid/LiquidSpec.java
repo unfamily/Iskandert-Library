@@ -170,6 +170,16 @@ public record LiquidSpec(
                 registerBucket, typeProperties, flowProperties, blockProperties, clientProperties, sounds, dimensionTicks);
     }
 
+    /** Rebinds this spec to another mod id (Library JSON fluids always register under {@code iska_lib}). */
+    public LiquidSpec withModId(String newModId) {
+        String desc = descriptionId;
+        if (defaultDescriptionId(modId, name).equals(descriptionId)) {
+            desc = defaultDescriptionId(newModId, name);
+        }
+        return new LiquidSpec(newModId, name, tintArgb, desc, lightLevel, stillTexture, flowingTexture,
+                registerBucket, typeProperties, flowProperties, blockProperties, clientProperties, sounds, dimensionTicks);
+    }
+
     public LiquidSpec withLoggable(boolean loggable) {
         LiquidTypeProperties type = loggable ? typeProperties.withLoggableDefaults() : typeProperties;
         return withTypeProperties(type).withBlockProperties(blockProperties.withLoggable(loggable));

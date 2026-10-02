@@ -1,4 +1,4 @@
-package net.unfamily.iskalib.liquid;
+package net.unfamily.iskalib.gas;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -12,6 +12,8 @@ import net.neoforged.fml.ModList;
 import net.unfamily.iskalib.IskaLib;
 import net.unfamily.iskalib.load.LoadFilesystemBootstrap;
 import net.unfamily.iskalib.load.LoadJson;
+import net.unfamily.iskalib.liquid.DimensionTickTransform;
+import net.unfamily.iskalib.liquid.LiquidBehaviorRegistry;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,50 +35,45 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 /**
- * Loads liquid definitions from {@code data/<namespace>/iska_lib/liquids/<id>.json}.
- * Root {@code type} must be {@link #TYPE_LIQUID}; fluid path id from {@code id} (default: file name).
+ * Loads gas definitions from {@code data/<namespace>/iska_lib/gases/<id>.json}.
+ * Root {@code type} must be {@link #TYPE_GAS}; path id from {@code id} (default: file name).
  * <p>
- * JSON cannot supply a custom {@link LiquidBlockFactory}. At Library init, jar resources under
- * {@code iska_lib} are scanned and registered via {@link IskaLibLiquids#registerLibraryLiquid}
- * (fluid + block + bucket). Datapack reload updates {@link LiquidBehaviorRegistry} overlays
- * (infinity / loggable / dimension ticks) for matching fluid ids; new fluid ids still require a restart.
+ * Gases are a special fluid: they rise and dissipate instead of spreading horizontally like liquids.
+ * JSON never accepts {@code flow_properties}. Supports {@code dimension_ticks} overlays via
+ * {@link net.unfamily.iskalib.liquid.LiquidBehaviorRegistry}. At Library init, jar resources under
+ * {@code iska_lib} are registered via {@link IskaLibGases#registerLibraryGas}. Datapack reload
+ * updates dimension-tick overlays (new gas ids still require a restart for registry-time registration).
  */
-public final class LiquidJsonLoader {
-    private static final Logger LOGGER = LoggerFactory.getLogger(LiquidJsonLoader.class);
+public final class GasJsonLoader {
+    private static final Logger LOGGER = LoggerFactory.getLogger(GasJsonLoader.class);
     private static final Gson GSON = new Gson();
-    public static final String TYPE_LIQUID = "iska_lib:liquid";
-    /** Relative to {@code data/<namespace>/}. */
-    public static final String LIQUIDS_SUBDIR = "iska_lib/liquids";
-    private static final String JAR_DIR = "data/" + IskaLib.MOD_ID + "/" + LIQUIDS_SUBDIR;
 
-    private LiquidJsonLoader() {}
+    public static final String TYPE_GAS = "iska_lib:gas";
+    public static final String GASES_SUBDIR = "iska_lib/gases";
+    private static final String JAR_DIR = "data/" + IskaLib.MOD_ID + "/" + GASES_SUBDIR;
+
+    private GasJsonLoader() {}
 
     public static void bootstrapFromJar() {
         bootstrapAndRegister(false);
     }
 
-    /**
-     * Scans Library jar liquids JSON, applies overlays, and registers brand-new {@code iska_lib} fluids.
-     *
-     * @param registerFluids when true, calls {@link IskaLibLiquids#registerLibraryLiquid} for each
-     *                       parsed {@code iska_lib} spec not already registered (mod-init only)
-     */
-    public static void bootstrapAndRegister(boolean registerFluids) {
-        Map<ResourceLocation, JsonObject> parsed = scanJarLiquids();
-        int external = mergeExternalLiquids(parsed);
+    public static void bootstrapAndRegister(boolean registerGases) {
+        Map<ResourceLocation, JsonObject> parsed = scanJarGases();
+        int external = mergeExternalGases(parsed);
         if (external > 0) {
-            LOGGER.info("Liquid JSON bootstrap: merged {} file(s) from kubejs/datapacks on disk", external);
+            LOGGER.info("Gas JSON bootstrap: merged {} file(s) from kubejs/datapacks on disk", external);
         }
-        if (registerFluids) {
-            registerParsedLibraryFluids(parsed);
+        if (registerGases) {
+            registerParsedLibraryGases(parsed);
         }
         applyParsed(parsed, true);
     }
 
-    private static int mergeExternalLiquids(Map<ResourceLocation, JsonObject> parsed) {
+    private static int mergeExternalGases(Map<ResourceLocation, JsonObject> parsed) {
         Map<ResourceLocation, JsonElement> external = new LinkedHashMap<>();
-        int count = LoadFilesystemBootstrap.mergeIntoDataDir(external, LIQUIDS_SUBDIR);
-        count += LoadFilesystemBootstrap.mergeIntoForType(external, TYPE_LIQUID);
+        int count = LoadFilesystemBootstrap.mergeIntoDataDir(external, GASES_SUBDIR);
+        count += LoadFilesystemBootstrap.mergeIntoForType(external, TYPE_GAS);
         int objects = 0;
         for (Map.Entry<ResourceLocation, JsonElement> entry : external.entrySet()) {
             if (entry.getValue() != null && entry.getValue().isJsonObject()) {
@@ -87,7 +84,7 @@ public final class LiquidJsonLoader {
         return objects > 0 ? count : 0;
     }
 
-    private static Map<ResourceLocation, JsonObject> scanJarLiquids() {
+    private static Map<ResourceLocation, JsonObject> scanJarGases() {
         Map<ResourceLocation, JsonObject> parsed = new LinkedHashMap<>();
         ModList.get().getModContainerById(IskaLib.MOD_ID).ifPresent(container -> {
             var owning = container.getModInfo().getOwningFile();
@@ -126,35 +123,35 @@ public final class LiquidJsonLoader {
                     }
                 }
             } catch (Exception e) {
-                LOGGER.warn("Failed to bootstrap liquid JSON from jar: {}", e.getMessage());
+                LOGGER.warn("Failed to bootstrap gas JSON from jar: {}", e.getMessage());
             }
         });
         return parsed;
     }
 
-    private static void registerParsedLibraryFluids(Map<ResourceLocation, JsonObject> parsed) {
+    private static void registerParsedLibraryGases(Map<ResourceLocation, JsonObject> parsed) {
         int registered = 0;
         for (Map.Entry<ResourceLocation, JsonObject> entry : parsed.entrySet()) {
             try {
-                ParsedLiquid parsedLiquid = parse(entry.getKey(), entry.getValue());
-                LiquidSpec spec = asLibraryOwned(parsedLiquid.spec());
-                ResourceLocation fluidId = ResourceLocation.fromNamespaceAndPath(IskaLib.MOD_ID, spec.name());
-                if (IskaLibLiquids.isRegistered(fluidId)) {
+                ParsedGas parsedGas = parse(entry.getKey(), entry.getValue());
+                GasSpec spec = asLibraryOwned(parsedGas.spec());
+                ResourceLocation fluidId = ResourceLocation.fromNamespaceAndPath(IskaLib.MOD_ID, spec.fluidSourceId());
+                if (IskaLibGases.isRegistered(fluidId)) {
                     continue;
                 }
-                IskaLibLiquids.registerLibraryLiquid(spec);
+                IskaLibGases.registerLibraryGas(spec);
                 registered++;
-                LOGGER.info("Registered library liquid from JSON: {} (source {})", fluidId, entry.getKey());
+                LOGGER.info("Registered library gas from JSON: {} (source {})", fluidId, entry.getKey());
             } catch (RuntimeException error) {
-                LOGGER.warn("Skipping library liquid registration for {}: {}", entry.getKey(), error.getMessage());
+                LOGGER.warn("Skipping library gas registration for {}: {}", entry.getKey(), error.getMessage());
             }
         }
         if (registered > 0) {
-            LOGGER.info("Library JSON liquids registered at bootstrap: {}", registered);
+            LOGGER.info("Library JSON gases registered at bootstrap: {}", registered);
         }
     }
 
-    private static LiquidSpec asLibraryOwned(LiquidSpec spec) {
+    private static GasSpec asLibraryOwned(GasSpec spec) {
         return IskaLib.MOD_ID.equals(spec.modId()) ? spec : spec.withModId(IskaLib.MOD_ID);
     }
 
@@ -165,7 +162,7 @@ public final class LiquidJsonLoader {
         }
         Map<ResourceLocation, JsonObject> parsed = new LinkedHashMap<>();
         Map<ResourceLocation, List<Resource>> stacks = resourceManager.listResourceStacks(
-                LIQUIDS_SUBDIR,
+                GASES_SUBDIR,
                 id -> id.getPath().endsWith(".json"));
         for (Map.Entry<ResourceLocation, List<Resource>> entry : stacks.entrySet()) {
             List<Resource> stack = entry.getValue();
@@ -179,11 +176,11 @@ public final class LiquidJsonLoader {
                     parsed.put(entry.getKey(), element.getAsJsonObject());
                 }
             } catch (IOException | JsonParseException ex) {
-                LOGGER.warn("Failed to read liquid JSON {}: {}", entry.getKey(), ex.getMessage());
+                LOGGER.warn("Failed to read gas JSON {}: {}", entry.getKey(), ex.getMessage());
             }
         }
         for (Map.Entry<ResourceLocation, JsonElement> entry :
-                LoadJson.collectMergedJsonForTypes(resourceManager, Set.of(TYPE_LIQUID)).entrySet()) {
+                LoadJson.collectMergedJsonForTypes(resourceManager, Set.of(TYPE_GAS)).entrySet()) {
             if (entry.getValue() != null && entry.getValue().isJsonObject()) {
                 parsed.put(entry.getKey(), entry.getValue().getAsJsonObject());
             }
@@ -196,87 +193,71 @@ public final class LiquidJsonLoader {
         for (Map.Entry<ResourceLocation, JsonObject> entry : parsed.entrySet()) {
             ResourceLocation resourceId = entry.getKey();
             try {
-                ParsedLiquid parsedLiquid = parse(resourceId, entry.getValue());
-                LiquidSpec librarySpec = asLibraryOwned(parsedLiquid.spec());
-                ResourceLocation fluidId = ResourceLocation.fromNamespaceAndPath(IskaLib.MOD_ID, librarySpec.name());
-                overlays.put(fluidId, parsedLiquid.overlay());
+                ParsedGas parsedGas = parse(resourceId, entry.getValue());
+                GasSpec librarySpec = asLibraryOwned(parsedGas.spec());
+                ResourceLocation fluidId = ResourceLocation.fromNamespaceAndPath(IskaLib.MOD_ID, librarySpec.fluidSourceId());
+                overlays.put(fluidId, parsedGas.overlay());
                 if (fromJar) {
-                    LOGGER.debug("Loaded liquid JSON {} -> {}", resourceId, fluidId);
+                    LOGGER.debug("Loaded gas JSON {} -> {}", resourceId, fluidId);
                 }
             } catch (RuntimeException error) {
-                LOGGER.warn("Invalid liquid JSON {}: {}", resourceId, error.getMessage());
+                LOGGER.warn("Invalid gas JSON {}: {}", resourceId, error.getMessage());
             }
         }
-        // Preserve Java-registered overlays that datapacks did not redefine.
         Map<ResourceLocation, LiquidBehaviorRegistry.Overlay> merged = new LinkedHashMap<>(LiquidBehaviorRegistry.all());
         merged.putAll(overlays);
         LiquidBehaviorRegistry.putAll(merged);
-        LOGGER.info("Liquid JSON overlays loaded: {} (source={})", overlays.size(), fromJar ? "jar" : "datapack");
+        LOGGER.info("Gas JSON overlays loaded: {} (source={})", overlays.size(), fromJar ? "jar" : "datapack");
     }
 
-    public static Optional<LiquidSpec> parseSpec(ResourceLocation resourceId, JsonObject json) {
+    public static Optional<GasSpec> parseSpec(ResourceLocation resourceId, JsonObject json) {
         try {
             return Optional.of(parse(resourceId, json).spec());
         } catch (RuntimeException error) {
-            LOGGER.warn("Failed to parse LiquidSpec from {}: {}", resourceId, error.getMessage());
+            LOGGER.warn("Failed to parse GasSpec from {}: {}", resourceId, error.getMessage());
             return Optional.empty();
         }
     }
 
-    private static ParsedLiquid parse(ResourceLocation resourceId, JsonObject json) {
-        assertLiquidType(resourceId, json);
+    private static ParsedGas parse(ResourceLocation resourceId, JsonObject json) {
+        assertGasType(resourceId, json);
         String namespace = resourceId.getNamespace();
         String fileName = fileNameWithoutExtension(resourceId);
         String id = resolveId(json, fileName);
         int tint = parseTint(json.get("tint"));
-        String descriptionId = stringOr(json, "description_id", LiquidSpec.defaultDescriptionId(namespace, id));
+        String descriptionId = stringOr(json, "description_id", GasSpec.defaultDescriptionId(namespace, id));
         int light = json.has("light") ? json.get("light").getAsInt() : 0;
-        boolean bucket = !json.has("bucket") || json.get("bucket").getAsBoolean();
-        Boolean infinityOverride = optionalBool(json, "infinity");
-        Boolean loggableOverride = optionalBool(json, "loggable");
-        boolean infinity = infinityOverride != null && infinityOverride;
-        boolean loggable = loggableOverride != null && loggableOverride;
+        int tickInterval = json.has("tick_interval")
+                ? json.get("tick_interval").getAsInt()
+                : GasSpec.DEFAULT_TICK_INTERVAL;
 
-        ResourceLocation still = parseTexture(json, "still", LiquidSpec.VANILLA_THIN_STILL);
-        ResourceLocation flowing = parseTexture(json, "flow", LiquidSpec.VANILLA_THIN_FLOW);
-        ResourceLocation overlay = parseOptionalTexture(json, "overlay");
-
-        LiquidTypeProperties type = LiquidTypeProperties.DEFAULT.withCanConvertToSource(infinity);
+        GasTypeProperties type = GasTypeProperties.STANDARD_GAS;
         JsonObject typeProps = typePropertiesObject(json);
         if (typeProps != null) {
             type = applyTypeSubset(type, typeProps);
         }
-        if (loggable) {
-            type = type.withLoggableDefaults().withCanConvertToSource(infinity || type.canConvertToSource());
-        }
 
-        FlowingFluidProperties flow = FlowingFluidProperties.DEFAULT;
-        if (json.has("flow_properties") && json.get("flow_properties").isJsonObject()) {
-            flow = applyFlowSubset(flow, json.getAsJsonObject("flow_properties"));
+        if (json.has("flow_properties")) {
+            LOGGER.warn("Gas JSON {} ignores flow_properties (gases rise; they do not spread like liquids)", resourceId);
         }
 
         List<DimensionTickTransform> ticks = parseDimensionTicks(json.get("dimension_ticks"));
 
-        LiquidSpec spec = new LiquidSpec(
-                namespace, id, tint, descriptionId, light, still, flowing, bucket,
-                type, flow, LiquidBlockProperties.STANDARD.withLoggable(loggable),
-                overlay == null ? LiquidClientProperties.NONE : LiquidClientProperties.withOverlay(overlay),
-                LiquidSoundSet.DEFAULT,
-                ticks);
-
-        ResourceLocation fluidId = ResourceLocation.fromNamespaceAndPath(namespace, id);
-        LiquidBehaviorRegistry.Overlay overlayBehavior =
-                new LiquidBehaviorRegistry.Overlay(infinityOverride, loggableOverride, ticks);
-        return new ParsedLiquid(fluidId, spec, overlayBehavior);
+        GasSpec spec = new GasSpec(namespace, id, tint, descriptionId, light, tickInterval)
+                .withTypeProperties(type)
+                .withDimensionTicks(ticks);
+        ResourceLocation fluidId = ResourceLocation.fromNamespaceAndPath(namespace, spec.fluidSourceId());
+        LiquidBehaviorRegistry.Overlay overlay = new LiquidBehaviorRegistry.Overlay(null, null, ticks);
+        return new ParsedGas(fluidId, spec, overlay);
     }
 
-    private static void assertLiquidType(ResourceLocation resourceId, JsonObject json) {
+    private static void assertGasType(ResourceLocation resourceId, JsonObject json) {
         if (!json.has("type") || !json.get("type").isJsonPrimitive()) {
-            throw new IllegalArgumentException("missing type " + TYPE_LIQUID + " in " + resourceId);
+            throw new IllegalArgumentException("missing type " + TYPE_GAS + " in " + resourceId);
         }
         String type = json.get("type").getAsString();
-        if (!TYPE_LIQUID.equals(type)) {
-            throw new IllegalArgumentException("expected type " + TYPE_LIQUID + ", got " + type);
+        if (!TYPE_GAS.equals(type)) {
+            throw new IllegalArgumentException("expected type " + TYPE_GAS + ", got " + type);
         }
     }
 
@@ -298,7 +279,7 @@ public final class LiquidJsonLoader {
         return null;
     }
 
-    private static LiquidTypeProperties applyTypeSubset(LiquidTypeProperties base, JsonObject obj) {
+    private static GasTypeProperties applyTypeSubset(GasTypeProperties base, JsonObject obj) {
         double motionScale = obj.has("motion_scale") ? obj.get("motion_scale").getAsDouble() : base.motionScale();
         boolean canPushEntity = obj.has("can_push_entity") ? obj.get("can_push_entity").getAsBoolean() : base.canPushEntity();
         boolean canSwim = obj.has("can_swim") ? obj.get("can_swim").getAsBoolean() : base.canSwim();
@@ -315,28 +296,11 @@ public final class LiquidJsonLoader {
         int density = obj.has("density") ? obj.get("density").getAsInt() : base.density();
         int temperature = obj.has("temperature") ? obj.get("temperature").getAsInt() : base.temperature();
         int viscosity = obj.has("viscosity") ? obj.get("viscosity").getAsInt() : base.viscosity();
-        return new LiquidTypeProperties(
+        return new GasTypeProperties(
                 motionScale, canPushEntity, canSwim, canDrown, fallDistanceModifier,
                 canExtinguish, canConvertToSource, supportsBoating, canHydrate,
                 base.pathType(), base.adjacentPathType(), base.rarity(),
                 density, temperature, viscosity);
-    }
-
-    private static FlowingFluidProperties applyFlowSubset(FlowingFluidProperties base, JsonObject obj) {
-        FlowingFluidProperties flow = base;
-        if (obj.has("tick_rate")) {
-            flow = flow.withTickRate(obj.get("tick_rate").getAsInt());
-        }
-        if (obj.has("slope_find_distance")) {
-            flow = flow.withSlopeFindDistance(obj.get("slope_find_distance").getAsInt());
-        }
-        if (obj.has("level_decrease_per_block")) {
-            flow = flow.withLevelDecreasePerBlock(obj.get("level_decrease_per_block").getAsInt());
-        }
-        if (obj.has("explosion_resistance")) {
-            flow = flow.withExplosionResistance(obj.get("explosion_resistance").getAsFloat());
-        }
-        return flow;
     }
 
     private static List<DimensionTickTransform> parseDimensionTicks(JsonElement element) {
@@ -388,26 +352,6 @@ public final class LiquidJsonLoader {
         throw new IllegalArgumentException("Invalid tint: " + element);
     }
 
-    private static ResourceLocation parseTexture(JsonObject json, String key, ResourceLocation fallback) {
-        if (json.has(key)) {
-            return ResourceLocation.parse(json.get(key).getAsString());
-        }
-        return fallback;
-    }
-
-    @Nullable
-    private static ResourceLocation parseOptionalTexture(JsonObject json, String key) {
-        if (json.has(key)) {
-            return ResourceLocation.parse(json.get(key).getAsString());
-        }
-        return null;
-    }
-
-    @Nullable
-    private static Boolean optionalBool(JsonObject json, String key) {
-        return json.has(key) ? json.get(key).getAsBoolean() : null;
-    }
-
     private static String stringOr(JsonObject json, String key, String fallback) {
         return json.has(key) ? json.get(key).getAsString() : fallback;
     }
@@ -428,7 +372,7 @@ public final class LiquidJsonLoader {
             if (!relative.endsWith(".json")) {
                 return;
             }
-            String idPath = LIQUIDS_SUBDIR + "/" + relative;
+            String idPath = GASES_SUBDIR + "/" + relative;
             ResourceLocation id = ResourceLocation.fromNamespaceAndPath(namespace, idPath);
             try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
                 JsonElement element = GSON.fromJson(reader, JsonElement.class);
@@ -437,9 +381,9 @@ public final class LiquidJsonLoader {
                 }
             }
         } catch (IOException | RuntimeException ex) {
-            LOGGER.warn("Failed to read liquid JSON {}: {}", file, ex.getMessage());
+            LOGGER.warn("Failed to read gas JSON {}: {}", file, ex.getMessage());
         }
     }
 
-    private record ParsedLiquid(ResourceLocation fluidId, LiquidSpec spec, LiquidBehaviorRegistry.Overlay overlay) {}
+    private record ParsedGas(ResourceLocation fluidId, GasSpec spec, LiquidBehaviorRegistry.Overlay overlay) {}
 }

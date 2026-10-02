@@ -1,4 +1,4 @@
-package net.unfamily.iskalib.liquid;
+package net.unfamily.iskalib.tool;
 
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
@@ -7,15 +7,11 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
-import net.unfamily.iskalib.gas.GasJsonLoader;
 import net.unfamily.iskalib.IskaLib;
 
-/**
- * Reloads liquid JSON behavior overlays from datapacks.
- */
 @EventBusSubscriber(modid = IskaLib.MOD_ID)
-public final class LiquidJsonReloadHooks {
-    private LiquidJsonReloadHooks() {}
+public final class ToolBehaviorReloadHooks {
+    private ToolBehaviorReloadHooks() {}
 
     @SubscribeEvent
     public static void onAddReloadListener(AddReloadListenerEvent event) {
@@ -27,15 +23,13 @@ public final class LiquidJsonReloadHooks {
 
             @Override
             protected void apply(Object prepared, ResourceManager resourceManager, ProfilerFiller profiler) {
-                LiquidJsonLoader.reload(resourceManager);
-                GasJsonLoader.reload(resourceManager);
+                ToolBehaviorLoader.loadAll(resourceManager);
             }
         });
     }
 
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent event) {
-        LiquidJsonLoader.reload(event.getServer().getResourceManager());
-        GasJsonLoader.reload(event.getServer().getResourceManager());
+        ToolBehaviorLoader.loadAll(event.getServer().getResourceManager());
     }
 }

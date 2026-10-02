@@ -1,4 +1,5 @@
 {
+  "itemGroup.iska_lib.fluids": "Iskandert's Library Fluids",
   "fluid.iska_lib.gas_fluid_example": "Example Gas",
   "commands.iska_lib.explosion.usage.title": "===== IskaLib Custom Explosion =====",
   "commands.iska_lib.explosion.usage.horizontal": "- horizontal_radius: X/Z radius of the ellipse (min: 1, no limit)",

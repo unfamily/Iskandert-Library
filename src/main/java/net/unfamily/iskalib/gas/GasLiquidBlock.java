@@ -2,11 +2,15 @@ package net.unfamily.iskalib.gas;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.damagesource.DamageSources;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
@@ -25,12 +29,16 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.unfamily.iskalib.liquid.DimensionTickTransform;
+import net.unfamily.iskalib.liquid.LiquidBehaviorRegistry;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.function.Supplier;
 
 /**
@@ -201,13 +209,24 @@ public class GasLiquidBlock extends LiquidBlock {
             return;
         }
         if (!live.getValue(COLLECTABLE)) {
-            schedule(level, pos);
+            if (level instanceof ServerLevel serverLevel) {
+                DimensionTickTransform match = findMatchingDimensionTransform(serverLevel, registered);
+                if (match != null) {
+                    schedule(level, pos, match.intervalTicks());
+                    return;
+                }
+            }
+            schedule(level, pos, tickInterval);
         }
     }
 
     private void schedule(Level level, BlockPos pos) {
+        schedule(level, pos, tickInterval);
+    }
+
+    private void schedule(Level level, BlockPos pos, int interval) {
         if (!level.isClientSide) {
-            level.scheduleTick(pos, this, tickInterval);
+            level.scheduleTick(pos, this, Math.max(1, interval));
         }
     }
 
@@ -240,6 +259,15 @@ public class GasLiquidBlock extends LiquidBlock {
         }
         RegisteredGas registered = gas.get();
         if (registered == null) {
+            return;
+        }
+
+        DimensionTickTransform dimensionMatch = findMatchingDimensionTransform(level, registered);
+        if (dimensionMatch != null) {
+            applyDimensionTransform(level, pos, dimensionMatch);
+            if (level.getBlockState(pos).getBlock() == this) {
+                level.scheduleTick(pos, this, dimensionMatch.intervalTicks());
+            }
             return;
         }
 
@@ -292,6 +320,61 @@ public class GasLiquidBlock extends LiquidBlock {
             return;
         }
         schedule(level, above);
+    }
+
+    @Nullable
+    private static DimensionTickTransform findMatchingDimensionTransform(ServerLevel level, RegisteredGas registered) {
+        ResourceLocation dimensionId = level.dimension().location();
+        List<DimensionTickTransform> transforms = LiquidBehaviorRegistry.dimensionTicks(
+                registered.sourceFluidId(), registered.spec().dimensionTicks());
+        for (DimensionTickTransform transform : transforms) {
+            if (transform.dimension().equals(dimensionId)) {
+                return transform;
+            }
+        }
+        return null;
+    }
+
+    private static void applyDimensionTransform(ServerLevel level, BlockPos pos, DimensionTickTransform transform) {
+        String preset = transform.resolvedPreset();
+        switch (preset) {
+            case "remove", "evaporate" -> level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            case "convert_to" -> convertDimensionTarget(level, pos, transform.transformTo());
+            case "damage" -> damageEntitiesInGas(level, pos);
+            default -> {
+                if (transform.transformTo() != null) {
+                    convertDimensionTarget(level, pos, transform.transformTo());
+                } else {
+                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+                }
+            }
+        }
+    }
+
+    private static void convertDimensionTarget(ServerLevel level, BlockPos pos, @Nullable ResourceLocation targetId) {
+        if (targetId == null) {
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            return;
+        }
+        Block block = BuiltInRegistries.BLOCK.getOptional(targetId).orElse(null);
+        if (block != null) {
+            level.setBlock(pos, block.defaultBlockState(), Block.UPDATE_ALL);
+            return;
+        }
+        Fluid fluid = BuiltInRegistries.FLUID.getOptional(targetId).orElse(null);
+        if (fluid != null && !fluid.defaultFluidState().isEmpty()) {
+            level.setBlock(pos, fluid.defaultFluidState().createLegacyBlock(), Block.UPDATE_ALL);
+            return;
+        }
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+    }
+
+    private static void damageEntitiesInGas(ServerLevel level, BlockPos pos) {
+        AABB box = new AABB(pos);
+        DamageSources sources = level.damageSources();
+        for (LivingEntity entity : level.getEntitiesOfClass(LivingEntity.class, box)) {
+            entity.hurt(sources.onFire(), 1.0F);
+        }
     }
 
     private static boolean isSameGasFluid(BlockState state, RegisteredGas gas) {

@@ -3,11 +3,11 @@ package net.unfamily.iskalib.marker;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
-import java.util.UUID;
-
 /**
- * Server-side cleanup for legacy temporary scanner markers spawned as {@code block_display}
+ * Server-side helpers for legacy temporary scanner markers spawned as {@code block_display}
  * entities (e.g. tag {@code temp_scan}). Wiring is registered in {@link LegacyBlockDisplayMarkerEvents}.
+ * <p>
+ * Orphan cleanup is intentionally disabled (no periodic scan / kill).
  */
 public final class ScannerMarkerCleanup {
     private ScannerMarkerCleanup() {}
@@ -37,31 +37,9 @@ public final class ScannerMarkerCleanup {
     }
 
     /**
-     * Removes orphaned marker entities from previous sessions.
+     * No-op. Orphaned marker cleanup is intentionally disabled.
      */
     public static void cleanupOrphanedMarkers(ServerLevel level) {
-        UUID sessionId = MarkerSession.getScannerSessionId();
-        String sessionTag = "session_" + sessionId;
-
-        String listCommand = String.format(
-                "execute as @e[type=block_display,tag=temp_scan] unless entity @s[tag=%s] run tag @s add scan_cleanup",
-                sessionTag
-        );
-
-        level.getServer().getCommands().performPrefixedCommand(
-                level.getServer().createCommandSourceStack().withSuppressedOutput(),
-                listCommand
-        );
-
-        level.getServer().getCommands().performPrefixedCommand(
-                level.getServer().createCommandSourceStack().withSuppressedOutput(),
-                "team leave @e[type=block_display,tag=scan_cleanup]"
-        );
-
-        level.getServer().getCommands().performPrefixedCommand(
-                level.getServer().createCommandSourceStack().withSuppressedOutput(),
-                "kill @e[type=block_display,tag=scan_cleanup]"
-        );
+        // Disabled.
     }
 }
-
