@@ -4,6 +4,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.unfamily.iskalib.client.gas.IskaLibGasBlockModels;
 import net.unfamily.iskalib.client.gas.IskaLibGasFluidModels;
 import net.unfamily.iskalib.client.liquid.IskaLibLiquidFluidModels;
+import net.unfamily.iskalib.client.tool.IskaLibToolItemModels;
 
 /**
  * Shared client hooks for consumer mods that register both gases and liquids via iska_lib.
@@ -21,6 +22,7 @@ public final class IskaLibConsumerClientHooks {
         modEventBus.addListener(IskaLibGasFluidModels::registerFluidModels);
         modEventBus.addListener(IskaLibGasBlockModels::registerBlockTintSources);
         modEventBus.addListener(IskaLibLiquidFluidModels::registerFluidModels);
+        modEventBus.addListener(IskaLibToolItemModels::onModifyBakingResult);
     }
 
     private static boolean isPhysicalClient() {

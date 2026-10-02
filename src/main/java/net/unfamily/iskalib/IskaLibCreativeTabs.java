@@ -7,14 +7,16 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.unfamily.iskalib.gas.IskaLibGases;
 import net.unfamily.iskalib.gas.RegisteredGas;
 import net.unfamily.iskalib.liquid.IskaLibLiquids;
 import net.unfamily.iskalib.liquid.RegisteredLiquid;
+import net.unfamily.iskalib.tool.IskaLibTools;
 
 /**
- * Creative tab for Library-owned JSON fluids/gases. Registered only when at least one bucket exists.
+ * Creative tab for Library-owned JSON fluids/gases/tools. Registered when at least one display item exists.
  */
 public final class IskaLibCreativeTabs {
     private static final DeferredRegister<CreativeModeTab> TABS =
@@ -37,14 +39,18 @@ public final class IskaLibCreativeTabs {
                         try {
                             output.accept(liquid.bucketItem());
                         } catch (RuntimeException ignored) {
-                            // Bucket deferred holder not ready / absent
                         }
                     }
                     for (RegisteredGas gas : IskaLibGases.allRegisteredGases()) {
                         try {
                             output.accept(gas.bucketItem());
                         } catch (RuntimeException ignored) {
-                            // ignore
+                        }
+                    }
+                    for (DeferredItem<Item> tool : IskaLibTools.allItems()) {
+                        try {
+                            output.accept(tool.get());
+                        } catch (RuntimeException ignored) {
                         }
                     }
                 })
@@ -58,10 +64,22 @@ public final class IskaLibCreativeTabs {
                 return true;
             }
         }
-        return !IskaLibGases.allRegisteredGases().isEmpty();
+        if (!IskaLibGases.allRegisteredGases().isEmpty()) {
+            return true;
+        }
+        return !IskaLibTools.allItems().isEmpty();
     }
 
     private static ItemStack firstIcon() {
+        for (DeferredItem<Item> tool : IskaLibTools.allItems()) {
+            try {
+                Item item = tool.get();
+                if (item != null && item != Items.AIR) {
+                    return new ItemStack(item);
+                }
+            } catch (RuntimeException ignored) {
+            }
+        }
         for (RegisteredLiquid liquid : IskaLibLiquids.allRegisteredLiquids()) {
             if (!liquid.spec().registerBucket()) {
                 continue;
@@ -72,7 +90,6 @@ public final class IskaLibCreativeTabs {
                     return new ItemStack(bucket);
                 }
             } catch (RuntimeException ignored) {
-                // try next
             }
         }
         for (RegisteredGas gas : IskaLibGases.allRegisteredGases()) {
@@ -82,9 +99,8 @@ public final class IskaLibCreativeTabs {
                     return new ItemStack(bucket);
                 }
             } catch (RuntimeException ignored) {
-                // try next
             }
         }
-        return new ItemStack(Items.BUCKET);
+        return new ItemStack(Items.IRON_PICKAXE);
     }
 }
