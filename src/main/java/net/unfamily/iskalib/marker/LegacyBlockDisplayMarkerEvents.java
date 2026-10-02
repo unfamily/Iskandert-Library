@@ -1,35 +1,24 @@
 package net.unfamily.iskalib.marker;
 
-import com.mojang.logging.LogUtils;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.LevelAccessor;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.unfamily.iskalib.IskaLib;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
 
 /**
- * Server lifecycle and tick hooks for legacy scanner markers implemented with
+ * Server lifecycle hooks for legacy scanner markers implemented with
  * {@code block_display} entities (command-spawned, {@code temp_scan} tag, session tags).
  * <p>
- * Client-side world markers ({@link net.unfamily.iskalib.client.marker.MarkRenderer}) are separate.
+ * Periodic orphan cleanup is disabled. Client-side world markers
+ * ({@link net.unfamily.iskalib.client.marker.MarkRenderer}) are separate.
  */
 @EventBusSubscriber(modid = IskaLib.MOD_ID)
 public final class LegacyBlockDisplayMarkerEvents {
-    private static final Logger LOGGER = LogUtils.getLogger();
-
     private LegacyBlockDisplayMarkerEvents() {}
-
-    @SubscribeEvent
-    public static void onPlayerTick(PlayerTickEvent.Pre event) {
-        runCleanupIfPlayer(event.getEntity().level(), event.getEntity());
-    }
 
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
@@ -43,16 +32,9 @@ public final class LegacyBlockDisplayMarkerEvents {
     }
 
     /**
-     * Optional entry point for mods that need to trigger cleanup from their own tick paths.
+     * No-op. Orphaned legacy marker cleanup is intentionally disabled.
      */
     public static void runCleanupIfPlayer(LevelAccessor world, @Nullable Entity entity) {
-        if (entity == null || world == null || !(world instanceof ServerLevel serverLevel) || !(entity instanceof ServerPlayer)) {
-            return;
-        }
-        try {
-            ScannerMarkerCleanup.cleanupOrphanedMarkers(serverLevel);
-        } catch (Exception e) {
-            LOGGER.error("Error cleaning legacy scanner markers: {}", e.getMessage());
-        }
+        // Disabled: do not scan or kill orphaned block_display markers.
     }
 }

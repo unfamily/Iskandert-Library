@@ -45,13 +45,15 @@ public class StageItemHandler {
     private static final Map<String, StageItemRestriction> ITEM_RESTRICTIONS = new HashMap<>();
 
     /**
-     * Loads all item restrictions from {@code data/<namespace>/load/iska_lib_stage_items/}.
+     * Loads item restrictions from any {@code data/<namespace>/load/…} file whose
+     * {@code type} is {@code iska_utils:stage_item} or {@code iska_lib:stage_item}.
+     * Recommended folder: {@code load/iska_utils_stage_items/}.
      */
     public static void loadAll(ResourceManager resourceManagerOrNull) {
         ITEM_RESTRICTIONS.clear();
         try {
             Map<Identifier, JsonElement> merged = resourceManagerOrNull != null
-                    ? LoadJson.collectMergedJsonForSubdir(resourceManagerOrNull, STAGE_ITEMS_SUBDIR, ACCEPTED_TYPES)
+                    ? LoadJson.collectMergedJsonForTypes(resourceManagerOrNull, ACCEPTED_TYPES)
                     : collectBootstrap();
             for (var e : LoadJson.orderedEntries(merged)) {
                 if (!e.getValue().isJsonObject()) {

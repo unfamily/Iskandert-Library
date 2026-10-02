@@ -39,6 +39,7 @@ public record LiquidBlockProperties(
         return BlockBehaviour.Properties.of()
                 .mapColor(mapColor)
                 .replaceable()
+                .noCollision()
                 .strength(strength)
                 .pushReaction(pushReaction)
                 .noLootTable()

@@ -7,4 +7,4 @@
 | 1.20.1 | Not Supported |
 | Older Versions | Not Supported |
 
-Shared library for Iskandert's mods: stages, structures, shop teams, scanner markers, progressive explosions, gas and liquids.
+Shared library for Iskandert's mods: stages, structures, shop teams, scanner markers, progressive explosions, gas, liquids, and AOE tool behaviors.

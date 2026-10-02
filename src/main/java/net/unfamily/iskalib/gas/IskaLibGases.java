@@ -12,6 +12,10 @@ import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
+import net.unfamily.iskalib.IskaLib;
+import net.unfamily.iskalib.liquid.LiquidBehaviorRegistry;
+import net.unfamily.iskalib.liquid.IskaLibOwnedLiquidRegisters;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +24,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Public API: consumer mods register gases on their mod event bus (NeoForge 26.1.2+ only).
+ * <p>
+ * {@link GasSpec#modId()} must be the <strong>hosting mod</strong> id, not {@code iska_lib}, unless
+ * registering via {@link #registerLibraryGas}.
  * <p>
  * Pass the consumer's existing {@link DeferredRegister} instances via {@link GasRegistrationRegisters}
  * so blocks/items/fluids share one registrar per namespace. Do not create a second {@code DeferredRegister}
@@ -30,24 +37,19 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class IskaLibGases {
     private static final Map<String, ModGasRegistration> BY_MOD = new ConcurrentHashMap<>();
     private static boolean interactionsInitialized;
+    private static IEventBus libraryModEventBus;
 
     private IskaLibGases() {}
 
     /** Called from {@link net.unfamily.iskalib.IskaLib} to wire global interaction handlers. */
     public static void initLibrary(IEventBus iskaLibModEventBus) {
-        ensureInteractions(iskaLibModEventBus);
+        libraryModEventBus = iskaLibModEventBus;
+        ensureInteractions();
     }
 
     private static void hookClientEventsOnce(IEventBus modEventBus) {
-        net.unfamily.iskalib.client.IskaLibConsumerClientHooks.hookConsumerModClientOnce(modEventBus);
-    }
-
-    private static boolean isPhysicalClient() {
-        try {
-            Class.forName("net.minecraft.client.Minecraft");
-            return true;
-        } catch (Throwable ignored) {
-            return false;
+        if (modEventBus != null) {
+            net.unfamily.iskalib.client.IskaLibConsumerClientHooks.hookConsumerModClientOnce(modEventBus);
         }
     }
 
@@ -71,7 +73,33 @@ public final class IskaLibGases {
         return reg.register(spec);
     }
 
-    private static void ensureInteractions(IEventBus iskaLibModEventBus) {
+    /**
+     * Registers a gas owned by {@code iska_lib} using Library deferred registers.
+     * Used by {@link GasJsonLoader} for jar-scoped JSON gases.
+     */
+    public static RegisteredGas registerLibraryGas(GasSpec spec) {
+        if (libraryModEventBus == null) {
+            throw new IllegalStateException("IskaLibGases.initLibrary must run before registerLibraryGas");
+        }
+        if (!IskaLib.MOD_ID.equals(spec.modId())) {
+            throw new IllegalArgumentException("Library-owned gases must use modId " + IskaLib.MOD_ID + ", got " + spec.modId());
+        }
+        return registerGas(libraryModEventBus, IskaLibOwnedLiquidRegisters.asGasRegisters(), spec);
+    }
+
+    public static boolean isRegistered(Identifier fluidId) {
+        if (fluidId == null) {
+            return false;
+        }
+        for (RegisteredGas gas : allRegisteredGases()) {
+            if (fluidId.equals(gas.sourceFluidId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void ensureInteractions() {
         if (!interactionsInitialized) {
             interactionsInitialized = true;
             NeoForge.EVENT_BUS.addListener(GasFluidInteractions::onRightClickBlock);
@@ -158,6 +186,11 @@ public final class IskaLibGases {
 
             registered.add(gas);
             GasRegistry.register(gas);
+
+            // Seed overlay so datapack dimension_ticks can refine without re-registering the fluid.
+            LiquidBehaviorRegistry.put(sourceFluidId, new LiquidBehaviorRegistry.Overlay(
+                    null, null, spec.dimensionTicks()));
+
             return gas;
         }
 
@@ -166,7 +199,7 @@ public final class IskaLibGases {
         }
     }
 
-    static List<RegisteredGas> allRegisteredGases() {
+    public static List<RegisteredGas> allRegisteredGases() {
         List<RegisteredGas> out = new ArrayList<>();
         for (ModGasRegistration reg : BY_MOD.values()) {
             out.addAll(reg.registeredGases());

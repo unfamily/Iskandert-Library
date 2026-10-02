@@ -1,4 +1,5 @@
 {
+  "itemGroup.iska_lib.fluids": "Fluidi Iskandert's Library",
   "commands.iska_lib.explosion.usage.title": "===== Esplosione Custom IskaLib =====",
   "commands.iska_lib.explosion.usage.horizontal": "- raggio_orizzontale: Raggio X/Z dell'ellisse (min: 1, no limite)",
   "commands.iska_lib.explosion.usage.vertical": "- raggio_verticale: Raggio Y dell'ellisse (1-1000)",

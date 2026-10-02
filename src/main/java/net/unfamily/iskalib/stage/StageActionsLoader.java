@@ -15,8 +15,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Loads stage action definitions from datapack JSON under {@code data/<namespace>/load/iska_lib_stage_actions/}.
- * Files use type {@code iska_utils:stage_actions} and contain actions that run when stages are added/removed.
+ * Loads stage actions from any {@code data/<namespace>/load/…} file whose {@code type} is
+ * {@code iska_utils:stage_actions} or {@code iska_lib:stage_actions}.
+ * Recommended folder: {@code load/iska_utils_stage_actions/}.
  */
 public class StageActionsLoader {
     public static final String STAGE_ACTIONS_SUBDIR = "iska_utils_stage_actions";
@@ -30,11 +31,11 @@ public class StageActionsLoader {
     private static final List<StageActionDefinition> LOADED_ACTIONS = new ArrayList<>();
 
     public static void loadAll(ResourceManager resourceManagerOrNull) {
-        LOGGER.info("Loading stage actions from datapack path load/{} ...", STAGE_ACTIONS_SUBDIR);
+        LOGGER.info("Loading stage actions (type match under load/) ...");
         LOADED_ACTIONS.clear();
         try {
             Map<Identifier, JsonElement> merged = resourceManagerOrNull != null
-                    ? LoadJson.collectMergedJsonForSubdir(resourceManagerOrNull, STAGE_ACTIONS_SUBDIR, ACCEPTED_TYPES)
+                    ? LoadJson.collectMergedJsonForTypes(resourceManagerOrNull, ACCEPTED_TYPES)
                     : collectBootstrap();
             for (var e : LoadJson.orderedEntries(merged)) {
                 if (!e.getValue().isJsonObject()) {

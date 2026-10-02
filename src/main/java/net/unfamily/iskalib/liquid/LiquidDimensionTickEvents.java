@@ -17,6 +17,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
+import net.unfamily.iskalib.gas.GasLiquidBlock;
 import net.unfamily.iskalib.IskaLib;
 import org.jetbrains.annotations.Nullable;
 
@@ -84,7 +85,8 @@ public final class LiquidDimensionTickEvents {
                 continue;
             }
             BlockState state = level.getBlockState(pos);
-            if (state.getBlock() instanceof DimensionTickLiquidBlock) {
+            if (state.getBlock() instanceof DimensionTickLiquidBlock
+                    || state.getBlock() instanceof GasLiquidBlock) {
                 it.remove();
                 continue;
             }
@@ -112,7 +114,8 @@ public final class LiquidDimensionTickEvents {
     }
 
     private static void maybeTrack(ServerLevel level, BlockPos pos, BlockState state) {
-        if (state.getBlock() instanceof DimensionTickLiquidBlock) {
+        if (state.getBlock() instanceof DimensionTickLiquidBlock
+                || state.getBlock() instanceof GasLiquidBlock) {
             return;
         }
         Identifier fluidId = resolveSourceFluidId(state);

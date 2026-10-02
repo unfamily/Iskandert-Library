@@ -24,10 +24,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
  * Collects JSON under {@code data/<namespace>/load/…} for Library-owned catalogs.
+ * <p>
+ * Namespace is always dynamic (any datapack/mod namespace). Matching is primarily by JSON
+ * {@code type}; recommended folder names under {@code load/} are conventions only.
  */
 public final class LoadJson {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoadJson.class);
@@ -36,44 +40,77 @@ public final class LoadJson {
 
     private LoadJson() {}
 
+    /**
+     * Collects every JSON under {@code load/} (any subfolder) whose root {@code type} is in
+     * {@code acceptedTypes}. Works for any datapack namespace.
+     */
+    public static Map<Identifier, JsonElement> collectMergedJsonForTypes(
+            ResourceManager resourceManager,
+            Set<String> acceptedTypes) {
+        if (acceptedTypes == null || acceptedTypes.isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+        return collectFromStacks(
+                resourceManager,
+                LOAD_FOLDER,
+                id -> id.getPath().endsWith(".json") && isUnderLoadTree(id),
+                parsed -> typeMatches(parsed, acceptedTypes));
+    }
+
+    /**
+     * Collects every JSON under {@code data/<any>/load/<subdir>/…} (any namespace), no type filter.
+     */
+    public static Map<Identifier, JsonElement> collectMergedJsonUnderLoadSubdir(
+            ResourceManager resourceManager,
+            String subdirUnderLoad) {
+        String prefix = LOAD_FOLDER + "/" + subdirUnderLoad + "/";
+        return collectFromStacks(
+                resourceManager,
+                LOAD_FOLDER,
+                id -> id.getPath().endsWith(".json") && id.getPath().startsWith(prefix),
+                parsed -> true);
+    }
+
+    /**
+     * Collects every JSON under {@code data/<any>/<directoryUnderDataNamespace>/…}.
+     */
+    public static Map<Identifier, JsonElement> collectMergedJsonUnderDataDir(
+            ResourceManager resourceManager,
+            String directoryUnderDataNamespace) {
+        return collectFromStacks(
+                resourceManager,
+                directoryUnderDataNamespace,
+                id -> id.getPath().endsWith(".json"),
+                parsed -> true);
+    }
+
+    /**
+     * Prefer {@link #collectMergedJsonForTypes}. Kept for callers that still pass a conventional
+     * subdir name; behavior is type-based across the whole {@code load/} tree.
+     */
     public static Map<Identifier, JsonElement> collectMergedJsonForSubdir(
             ResourceManager resourceManager,
             String subdirUnderLoad,
             Set<String> acceptedTypes) {
-        Map<Identifier, JsonElement> out = new LinkedHashMap<>();
-        String prefix = LOAD_FOLDER + "/" + subdirUnderLoad + "/";
-        Map<Identifier, List<Resource>> stacks = resourceManager.listResourceStacks(
-                LOAD_FOLDER,
-                id -> id.getPath().endsWith(".json")
-                        && (id.getPath().startsWith(prefix) || isFlatLoadJson(id)));
-        for (Map.Entry<Identifier, List<Resource>> entry : stacks.entrySet()) {
-            List<Resource> stack = entry.getValue();
-            if (stack.isEmpty()) {
-                continue;
-            }
-            Resource top = stack.get(stack.size() - 1);
-            try (var reader = new BufferedReader(new InputStreamReader(top.open(), StandardCharsets.UTF_8))) {
-                JsonElement parsed = GSON.fromJson(reader, JsonElement.class);
-                if (parsed == null) {
-                    continue;
-                }
-                Identifier id = entry.getKey();
-                if (id.getPath().startsWith(prefix) || typeMatches(parsed, acceptedTypes)) {
-                    out.put(id, parsed);
-                }
-            } catch (IOException | JsonParseException ex) {
-                LOGGER.error("Failed to read load JSON {}: {}", entry.getKey(), ex.getMessage());
-            }
-        }
-        return out;
+        return collectMergedJsonForTypes(resourceManager, acceptedTypes);
     }
 
     public static Map<Identifier, JsonElement> collectFromModJar(
             String modId,
             String dataNamespace,
             String subdirUnderLoad) {
+        return collectFromModJarPath(modId, dataNamespace, LOAD_FOLDER + "/" + subdirUnderLoad);
+    }
+
+    /**
+     * Bootstrap JSON from {@code data/<dataNamespace>/<relativeUnderData>/} inside {@code modId}'s jar.
+     */
+    public static Map<Identifier, JsonElement> collectFromModJarPath(
+            String modId,
+            String dataNamespace,
+            String relativeUnderData) {
         Map<Identifier, JsonElement> out = new LinkedHashMap<>();
-        String dirInRoot = "data/" + dataNamespace + "/" + LOAD_FOLDER + "/" + subdirUnderLoad;
+        String dirInRoot = "data/" + dataNamespace + "/" + relativeUnderData;
         ModList.get().getModContainerById(modId).ifPresent(container -> {
             var owning = container.getModInfo().getOwningFile();
             if (owning == null) {
@@ -94,7 +131,7 @@ public final class LoadJson {
                             walk.filter(Files::isRegularFile)
                                     .filter(p -> p.toString().endsWith(".json"))
                                     .sorted()
-                                    .forEach(file -> readOne(out, base, file, dataNamespace, subdirUnderLoad));
+                                    .forEach(file -> readOne(out, base, file, dataNamespace, relativeUnderData));
                         }
                     }
                 } else {
@@ -105,13 +142,13 @@ public final class LoadJson {
                                 walk.filter(Files::isRegularFile)
                                         .filter(p -> p.toString().endsWith(".json"))
                                         .sorted()
-                                        .forEach(file -> readOne(out, base, file, dataNamespace, subdirUnderLoad));
+                                        .forEach(file -> readOne(out, base, file, dataNamespace, relativeUnderData));
                             }
                         }
                     }
                 }
             } catch (Exception e) {
-                LOGGER.warn("Failed to bootstrap load/{} from {}: {}", subdirUnderLoad, modId, e.getMessage());
+                LOGGER.warn("Failed to bootstrap {} from {}: {}", relativeUnderData, modId, e.getMessage());
             }
         });
         return out;
@@ -135,6 +172,31 @@ public final class LoadJson {
         return file;
     }
 
+    private static Map<Identifier, JsonElement> collectFromStacks(
+            ResourceManager resourceManager,
+            String listRoot,
+            Predicate<Identifier> locationFilter,
+            Predicate<JsonElement> keep) {
+        Map<Identifier, JsonElement> out = new LinkedHashMap<>();
+        Map<Identifier, List<Resource>> stacks = resourceManager.listResourceStacks(listRoot, locationFilter);
+        for (Map.Entry<Identifier, List<Resource>> entry : stacks.entrySet()) {
+            List<Resource> stack = entry.getValue();
+            if (stack.isEmpty()) {
+                continue;
+            }
+            Resource top = stack.get(stack.size() - 1);
+            try (var reader = new BufferedReader(new InputStreamReader(top.open(), StandardCharsets.UTF_8))) {
+                JsonElement parsed = GSON.fromJson(reader, JsonElement.class);
+                if (parsed != null && keep.test(parsed)) {
+                    out.put(entry.getKey(), parsed);
+                }
+            } catch (IOException | JsonParseException ex) {
+                LOGGER.error("Failed to read load JSON {}: {}", entry.getKey(), ex.getMessage());
+            }
+        }
+        return out;
+    }
+
     private static int namespacePriority(String namespace) {
         if ("iska_lib".equals(namespace)) {
             return 0;
@@ -145,13 +207,9 @@ public final class LoadJson {
         return 2;
     }
 
-    private static boolean isFlatLoadJson(Identifier id) {
+    private static boolean isUnderLoadTree(Identifier id) {
         String p = id.getPath();
-        if (!p.startsWith(LOAD_FOLDER + "/") || !p.endsWith(".json")) {
-            return false;
-        }
-        String after = p.substring(LOAD_FOLDER.length() + 1);
-        return !after.contains("/");
+        return p.startsWith(LOAD_FOLDER + "/") && p.endsWith(".json");
     }
 
     private static boolean typeMatches(JsonElement element, Set<String> acceptedTypes) {
@@ -170,14 +228,14 @@ public final class LoadJson {
             Path base,
             Path file,
             String dataNamespace,
-            String subdirUnderLoad) {
+            String relativeUnderData) {
         try {
             String relative = base.relativize(file).toString().replace('\\', '/');
             if (!relative.endsWith(".json")) {
                 return;
             }
             Identifier id = Identifier.fromNamespaceAndPath(
-                    dataNamespace, LOAD_FOLDER + "/" + subdirUnderLoad + "/" + relative);
+                    dataNamespace, relativeUnderData + "/" + relative);
             try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
                 JsonElement element = GSON.fromJson(reader, JsonElement.class);
                 if (element != null) {
