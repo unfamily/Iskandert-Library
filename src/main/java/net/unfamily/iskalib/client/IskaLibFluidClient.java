@@ -9,6 +9,7 @@ import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtension
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.unfamily.iskalib.IskaLib;
+import net.unfamily.iskalib.client.tool.IskaLibToolItemModels;
 import net.unfamily.iskalib.gas.GasRegistry;
 import net.unfamily.iskalib.gas.RegisteredGas;
 import net.unfamily.iskalib.liquid.IskaLibLiquids;
@@ -32,6 +33,7 @@ public final class IskaLibFluidClient {
         }
         modEventBus.addListener(IskaLibFluidClient::registerClientExtensions);
         modEventBus.addListener(IskaLibFluidClient::registerBlockColors);
+        modEventBus.addListener(IskaLibToolItemModels::onModifyBakingResult);
     }
 
     private static boolean isPhysicalClient() {

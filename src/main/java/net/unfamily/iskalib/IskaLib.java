@@ -53,9 +53,9 @@ public class IskaLib {
         IskaLibLiquids.initLibrary(modEventBus);
         LiquidJsonLoader.bootstrapAndRegister(true);
         GasJsonLoader.bootstrapAndRegister(true);
+        ToolBehaviorLoader.loadAllBootstrap();
         IskaLibCreativeTabs.registerIfNeeded(modEventBus);
         StageBootstrap.install();
-        ToolBehaviorLoader.loadAllBootstrap();
         modEventBus.addListener(IskaLibGases::registerCapabilities);
         NeoForge.EVENT_BUS.register(ExplosionSystem.class);
         ShopCurrencyCatalog.bootstrapFromJar();

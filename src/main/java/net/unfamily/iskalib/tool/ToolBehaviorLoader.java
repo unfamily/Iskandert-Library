@@ -22,12 +22,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * AOE tool behaviors: bind an item id to lumberjack / excavator / scythe / paxel.
+ * Tool JSON is <strong>startup</strong>: creates Library items {@code iska_lib:<id>} and AOE behavior.
+ * {@code /reload} only refreshes behavior overlays for items already registered (new ids need a restart).
  * <p>
- * JSON: {@code "id"} path only; always registered as {@code iska_lib:<id>}. No {@code item} field.
- * Optional {@code durability}: {@code -1} = infinite AOE extras, {@code >= 0} = flat damage once for extras.
- * <p>
- * Java: {@link #register} may use any hosting-mod item id.
+ * Java {@link #register} binds AOE to any existing item id (any mod) without creating an item.
  */
 public final class ToolBehaviorLoader {
     private static final Logger LOGGER = LoggerFactory.getLogger(ToolBehaviorLoader.class);
@@ -43,8 +41,37 @@ public final class ToolBehaviorLoader {
 
     private ToolBehaviorLoader() {}
 
-    public static void loadAll(ResourceManager resourceManagerOrNull) {
+    /** Startup only: scan disk/jar, register {@code iska_lib} items, seed behaviors. */
+    public static void loadAllBootstrap() {
         FROM_JSON.clear();
+        Map<ResourceLocation, JsonElement> merged = collectMerged(null);
+        for (var e : LoadJson.orderedEntries(merged)) {
+            parseRoot(e.getKey().toString(), e.getValue(), true);
+        }
+        LOGGER.info("Tool startup: {} library item(s), {} java binding(s)", FROM_JSON.size(), FROM_JAVA.size());
+    }
+
+    /**
+     * Datapack reload: refresh AOE overlays for already-registered Library tools / Java bindings.
+     * Does <strong>not</strong> create new registry items.
+     */
+    public static void loadAll(ResourceManager resourceManager) {
+        Map<ResourceLocation, ToolBehaviorDefinition> previous = new HashMap<>(FROM_JSON);
+        FROM_JSON.clear();
+        Map<ResourceLocation, JsonElement> merged = collectMerged(resourceManager);
+        for (var e : LoadJson.orderedEntries(merged)) {
+            parseRoot(e.getKey().toString(), e.getValue(), false);
+        }
+        for (ResourceLocation id : previous.keySet()) {
+            if (!FROM_JSON.containsKey(id) && IskaLibTools.isRegistered(id)) {
+                FROM_JSON.put(id, previous.get(id));
+            }
+        }
+        LOGGER.info("Tool reload overlays: {} json, {} java (new item ids still need a restart)",
+                FROM_JSON.size(), FROM_JAVA.size());
+    }
+
+    private static Map<ResourceLocation, JsonElement> collectMerged(ResourceManager resourceManagerOrNull) {
         Map<ResourceLocation, JsonElement> merged = new LinkedHashMap<>();
         if (resourceManagerOrNull != null) {
             merged.putAll(LoadJson.collectMergedJsonForTypes(resourceManagerOrNull, ACCEPTED_TYPES));
@@ -58,19 +85,9 @@ public final class ToolBehaviorLoader {
                 LOGGER.info("Tool JSON bootstrap: merged {} file(s) from configured datapack paths", external);
             }
         }
-        for (var e : LoadJson.orderedEntries(merged)) {
-            parseRoot(e.getKey().toString(), e.getValue());
-        }
-        LOGGER.info("Tool behavior configurations loaded: {} json, {} java", FROM_JSON.size(), FROM_JAVA.size());
+        return merged;
     }
 
-    public static void loadAllBootstrap() {
-        loadAll(null);
-    }
-
-    /**
-     * Java registration for an item owned by the hosting mod. Survives datapack reload; overrides JSON.
-     */
     public static void register(
             ResourceLocation itemId,
             ToolBehaviorType behavior,
@@ -118,7 +135,7 @@ public final class ToolBehaviorLoader {
         return Map.copyOf(out);
     }
 
-    private static void parseRoot(String source, JsonElement root) {
+    private static void parseRoot(String source, JsonElement root, boolean registerItems) {
         if (root == null || !root.isJsonObject()) {
             return;
         }
@@ -131,17 +148,17 @@ public final class ToolBehaviorLoader {
         if (obj.has("tools") && obj.get("tools").isJsonArray()) {
             for (JsonElement entry : obj.getAsJsonArray("tools")) {
                 if (entry.isJsonObject()) {
-                    parseEntry(source, entry.getAsJsonObject());
+                    parseEntry(source, entry.getAsJsonObject(), registerItems);
                 }
             }
             return;
         }
         if (obj.has("id")) {
-            parseEntry(source, obj);
+            parseEntry(source, obj, registerItems);
         }
     }
 
-    private static void parseEntry(String source, JsonObject json) {
+    private static void parseEntry(String source, JsonObject json, boolean registerItems) {
         try {
             String idPath = resolveIdPath(requiredString(json, "id"));
             ResourceLocation itemId = ResourceLocation.fromNamespaceAndPath(IskaLib.MOD_ID, idPath);
@@ -153,7 +170,18 @@ public final class ToolBehaviorLoader {
                     ? json.get("durability").getAsInt()
                     : ToolBehaviorDefinition.DURABILITY_VANILLA;
             List<TagKey<Block>> tags = parseHarvestTags(json);
-            FROM_JSON.put(itemId, new ToolBehaviorDefinition(itemId, behavior, range, tags, durability));
+            ToolBehaviorDefinition def = new ToolBehaviorDefinition(itemId, behavior, range, tags, durability);
+
+            if (registerItems) {
+                IskaLibTools.registerLibraryTool(def);
+                FROM_JSON.put(itemId, def);
+            } else if (IskaLibTools.isRegistered(itemId)) {
+                FROM_JSON.put(itemId, def);
+            } else {
+                LOGGER.warn(
+                        "Tool JSON {} id {} is new; item registration is startup-only — restart the game to create iska_lib:{}",
+                        source, idPath, idPath);
+            }
         } catch (Exception ex) {
             LOGGER.warn("Invalid tool behavior in {}: {}", source, ex.getMessage());
         }
@@ -163,6 +191,10 @@ public final class ToolBehaviorLoader {
         String id = raw.trim();
         if (id.contains(":")) {
             ResourceLocation parsed = ResourceLocation.parse(id);
+            if (!IskaLib.MOD_ID.equals(parsed.getNamespace())) {
+                throw new IllegalArgumentException(
+                        "JSON tool id must be path-only or iska_lib:<path> (got " + id + "); other modids are Java-only");
+            }
             return parsed.getPath();
         }
         return id;
