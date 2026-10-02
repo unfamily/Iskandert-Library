@@ -5,7 +5,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.EventPriority;
@@ -51,7 +50,6 @@ public final class ToolBehaviorEvents {
             return;
         }
 
-        boolean controlDurability = !def.isVanillaDurability();
         int damageBefore = tool.getDamageValue();
 
         AOE_GUARD.set(true);
@@ -73,11 +71,9 @@ public final class ToolBehaviorEvents {
             AOE_GUARD.set(false);
         }
 
-        if (controlDurability && !tool.isEmpty()) {
+        // durability JSON = max item uses; AOE extras use vanilla 1-damage-per-block unless unbreakable
+        if (def.isInfiniteDurability() && !tool.isEmpty()) {
             tool.setDamageValue(damageBefore);
-            if (!def.isInfiniteDurability() && def.durability() > 0) {
-                tool.hurtAndBreak(def.durability(), player, EquipmentSlot.MAINHAND);
-            }
         }
     }
 }
