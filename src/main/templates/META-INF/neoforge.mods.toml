@@ -37,24 +37,28 @@ config="${mod_id}.mixins.json"
 [[dependencies.${mod_id}]]
     modId="ftblibrary"
     type="optional"
+    versionRange="[0,)"
     ordering="AFTER"
     side="BOTH"
 
 [[dependencies.${mod_id}]]
     modId="ftbteams"
     type="optional"
+    versionRange="[0,)"
     ordering="AFTER"
     side="BOTH"
 
 [[dependencies.${mod_id}]]
     modId="ftbquests"
     type="optional"
+    versionRange="[0,)"
     ordering="AFTER"
     side="BOTH"
 
 [[dependencies.${mod_id}]]
     modId="ftbultimine"
     type="optional"
+    versionRange="[0,)"
     ordering="AFTER"
     side="BOTH"
 

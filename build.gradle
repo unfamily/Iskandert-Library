@@ -66,7 +66,6 @@ configurations {
 
 dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.7:processor'
-    implementation 'io.github.llamalad7:mixinextras-neoforge:0.5.0'
 
     compileOnly 'curse.maven:architectury-api-419699:5786327'
     localRuntime 'curse.maven:architectury-api-419699:5786327'
