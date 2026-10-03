@@ -15,12 +15,18 @@ import java.util.function.Function;
 import org.slf4j.Logger;
 
 /**
- * Splits datapack recipe JSON bundles ({@code recipes}/{@code sources}/{@code entries}) into
+ * Splits datapack recipe JSON bundles
+ * ({@code recipes}/{@code sources}/{@code entries}/{@code valid_blocks}) into
  * one RecipeManager entry per array element, before KubeJS/CraftTweaker see the map.
  *
- * <p>Child id is always {@code <ns>:<path>_<index>} (continuous index). Optional entry
- * {@code "id"} is left in JSON as metadata only and is not used for the ResourceLocation
- * and is never mirrored into {@code results}/{@code ingredients}.
+ * <p>Default child id is {@code <ns>:<path>_<index>} (continuous index). Optional entry
+ * {@code "id"} is left in JSON as metadata only (except heating coils — see below).
+ *
+ * <p>{@code *:heating_coils}: each coil entry is further split per {@code consume} option into
+ * {@code <ns>:heating_coils_<coilPath>_<optionIndex>}.
+ *
+ * <p>These child ids are the single public contract for RecipeManager, KubeJS, CraftTweaker,
+ * JEI, EMI, REI, and any other mod that reads recipe ids.
  *
  * <p>Also injects KubeJS-friendly {@code results} / {@code ingredients} mirrors from common
  * I/O field aliases ({@code input}/{@code inputs}, {@code output}/{@code outputs},
@@ -30,7 +36,8 @@ import org.slf4j.Logger;
 public final class RecipeBundleSplitter {
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    private static final List<String> BUNDLE_KEYS = List.of("recipes", "sources", "entries");
+    private static final List<String> BUNDLE_KEYS =
+            List.of("recipes", "sources", "entries", "valid_blocks");
 
     private static final Set<String> TARGET_TYPES = ConcurrentHashMap.newKeySet();
 
@@ -85,6 +92,15 @@ public final class RecipeBundleSplitter {
                 continue;
             }
 
+            if (isHeatingCoilsType(type)) {
+                int n = expandHeatingCoils(recipeJsons, parseKey, keyToString, entry.getKey(), root, type);
+                if (n > 0) {
+                    splitFiles++;
+                    childCount += n;
+                }
+                continue;
+            }
+
             List<IndexedEntry> bundled = collectBundledEntries(root);
             if (bundled.isEmpty()) {
                 injectKubeMatchFields(root);
@@ -124,6 +140,104 @@ public final class RecipeBundleSplitter {
                     childCount,
                     TARGET_TYPES);
         }
+    }
+
+    private static boolean isHeatingCoilsType(String type) {
+        return type != null && type.endsWith(":heating_coils");
+    }
+
+    /**
+     * {@code ns:heating_coils_<coilPath>_<optionIndex>} — one RecipeManager entry per consume option.
+     *
+     * @return number of child recipes inserted (0 = left unchanged)
+     */
+    private static <K> int expandHeatingCoils(
+            Map<K, JsonElement> recipeJsons,
+            Function<String, K> parseKey,
+            Function<K, String> keyToString,
+            K parentKey,
+            JsonObject root,
+            String type) {
+        String parentId = keyToString.apply(parentKey);
+        int colon = parentId.indexOf(':');
+        String ns = colon >= 0 ? parentId.substring(0, colon) : parentId;
+
+        List<JsonObject> coilObjects = new ArrayList<>();
+        List<IndexedEntry> bundled = collectBundledEntries(root);
+        if (!bundled.isEmpty()) {
+            for (IndexedEntry indexed : bundled) {
+                coilObjects.add(indexed.entry());
+            }
+        } else if (root.has("coils") && root.get("coils").isJsonArray()) {
+            for (JsonElement el : root.getAsJsonArray("coils")) {
+                if (el != null && el.isJsonObject()) {
+                    coilObjects.add(el.getAsJsonObject());
+                }
+            }
+        } else if (root.has("id")) {
+            coilObjects.add(root);
+        } else {
+            injectKubeMatchFields(root);
+            return 0;
+        }
+
+        recipeJsons.remove(parentKey);
+        int childCount = 0;
+        for (JsonObject coil : coilObjects) {
+            if (!coil.has("id") || !coil.get("id").isJsonPrimitive()) {
+                LOGGER.warn("Heating coil split: missing id in {}", parentId);
+                continue;
+            }
+            String coilIdStr = coil.get("id").getAsString();
+            int coilColon = coilIdStr.indexOf(':');
+            String coilPath = coilColon >= 0 ? coilIdStr.substring(coilColon + 1) : coilIdStr;
+            coilPath = coilPath.replace('/', '_');
+            while (coilPath.startsWith("_")) {
+                coilPath = coilPath.substring(1);
+            }
+
+            JsonArray consume = coil.has("consume") && coil.get("consume").isJsonArray()
+                    ? coil.getAsJsonArray("consume")
+                    : new JsonArray();
+
+            List<JsonObject> options = new ArrayList<>();
+            for (JsonElement ce : consume) {
+                if (ce != null && ce.isJsonObject()) {
+                    options.add(ce.getAsJsonObject());
+                }
+            }
+            if (options.isEmpty()) {
+                options.add(new JsonObject());
+            }
+
+            for (int i = 0; i < options.size(); i++) {
+                String childId = ns + ":heating_coils_" + coilPath + "_" + i;
+                K childKey;
+                try {
+                    childKey = parseKey.apply(childId);
+                } catch (RuntimeException ex) {
+                    LOGGER.warn("Heating coil split: invalid child id {} from {}", childId, parentId);
+                    continue;
+                }
+                if (recipeJsons.containsKey(childKey)) {
+                    LOGGER.warn("Heating coil split: child id {} already exists; skipping", childId);
+                    continue;
+                }
+                JsonObject child = coil.deepCopy();
+                child.addProperty("type", type);
+                JsonArray single = new JsonArray();
+                if (!options.get(i).entrySet().isEmpty()) {
+                    single.add(options.get(i).deepCopy());
+                }
+                child.add("consume", single);
+                child.remove("results");
+                child.remove("ingredients");
+                injectKubeMatchFields(child);
+                recipeJsons.put(childKey, child);
+                childCount++;
+            }
+        }
+        return childCount;
     }
 
     private static List<IndexedEntry> collectBundledEntries(JsonObject root) {
