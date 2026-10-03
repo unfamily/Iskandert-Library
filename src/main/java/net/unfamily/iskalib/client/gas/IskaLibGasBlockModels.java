@@ -2,6 +2,7 @@ package net.unfamily.iskalib.client.gas;
 
 import net.minecraft.client.color.block.BlockTintSources;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
+import net.unfamily.iskalib.client.OncePerEvent;
 import net.unfamily.iskalib.gas.GasRegistry;
 import net.unfamily.iskalib.gas.RegisteredGas;
 
@@ -15,6 +16,9 @@ public final class IskaLibGasBlockModels {
     private IskaLibGasBlockModels() {}
 
     public static void registerBlockTintSources(RegisterColorHandlersEvent.BlockTintSources event) {
+        if (!OncePerEvent.claim(IskaLibGasBlockModels.class, event)) {
+            return;
+        }
         for (RegisteredGas gas : GasRegistry.all()) {
             // Registries are frozen before BlockColors.createDefault; holders must resolve here.
             event.register(List.of(BlockTintSources.constant(gas.tintArgb())), gas.block());

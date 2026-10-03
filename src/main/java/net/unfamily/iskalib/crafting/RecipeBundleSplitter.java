@@ -19,10 +19,13 @@ import org.slf4j.Logger;
  * one RecipeManager entry per array element, before KubeJS/CraftTweaker see the map.
  *
  * <p>Child id is always {@code <ns>:<path>_<index>} (continuous index). Optional entry
- * {@code "id"} is left in JSON as metadata only and is not used for the ResourceLocation.
+ * {@code "id"} is left in JSON as metadata only and is not used for the ResourceLocation
+ * and is never mirrored into {@code results}/{@code ingredients}.
  *
- * <p>Also injects KubeJS-friendly {@code results} / {@code ingredients} mirrors so generic
- * remove/replace filters can match custom select/require/produce layouts.
+ * <p>Also injects KubeJS-friendly {@code results} / {@code ingredients} mirrors from common
+ * I/O field aliases ({@code input}/{@code inputs}, {@code output}/{@code outputs},
+ * {@code produce}/{@code require}/{@code select}, …) so generic remove/replace filters work
+ * across mod schemas without per-mod hardcoding.
  */
 public final class RecipeBundleSplitter {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -147,43 +150,47 @@ public final class RecipeBundleSplitter {
     }
 
     /**
-     * Adds {@code results} (item ids) and {@code ingredients} (item/tag ids) for KubeJS matching.
-     * Leaves native fields ({@code select}, {@code produce}, {@code require}, {@code input}) intact.
+     * Adds {@code results} / {@code ingredients} for KubeJS matching when absent.
+     * Does not scrape entry-level metadata {@code "id"} (e.g. factory {@code dye_berry}).
+     * Skips chemical selectors ({@code %…}).
      */
     static void injectKubeMatchFields(JsonObject child) {
+        boolean hasResults = child.has("results") && child.get("results").isJsonArray()
+                && !child.getAsJsonArray("results").isEmpty();
+        boolean hasIngredients = child.has("ingredients") && child.get("ingredients").isJsonArray()
+                && !child.getAsJsonArray("ingredients").isEmpty();
+
         LinkedHashSet<String> results = new LinkedHashSet<>();
         LinkedHashSet<String> ingredients = new LinkedHashSet<>();
 
-        collectOutputIds(child, results);
-        if (child.has("if") && child.get("if").isJsonArray()) {
-            for (JsonElement branchEl : child.getAsJsonArray("if")) {
-                if (branchEl != null && branchEl.isJsonObject()) {
-                    JsonObject branch = branchEl.getAsJsonObject();
-                    // Factory if[] payloads often nest select under the branch object.
-                    collectOutputIds(branch, results);
-                    if (branch.has("then") && branch.get("then").isJsonObject()) {
-                        collectOutputIds(branch.getAsJsonObject("then"), results);
+        if (!hasResults) {
+            collectOutputIds(child, results);
+            if (child.has("if") && child.get("if").isJsonArray()) {
+                for (JsonElement branchEl : child.getAsJsonArray("if")) {
+                    if (branchEl != null && branchEl.isJsonObject()) {
+                        JsonObject branch = branchEl.getAsJsonObject();
+                        collectOutputIds(branch, results);
+                        if (branch.has("then") && branch.get("then").isJsonObject()) {
+                            collectOutputIds(branch.getAsJsonObject("then"), results);
+                        }
                     }
                 }
             }
         }
 
-        if (child.has("input") && child.get("input").isJsonPrimitive()) {
-            String input = child.get("input").getAsString().trim();
-            if (!input.isEmpty()) {
-                ingredients.add(input);
-            }
+        if (!hasIngredients) {
+            collectInputAliases(child, ingredients);
+            collectRequireIds(child, ingredients);
         }
-        collectRequireIds(child, ingredients);
 
-        if (!results.isEmpty()) {
+        if (!hasResults && !results.isEmpty()) {
             JsonArray arr = new JsonArray();
             for (String id : results) {
                 arr.add(itemStackJson(id));
             }
             child.add("results", arr);
         }
-        if (!ingredients.isEmpty()) {
+        if (!hasIngredients && !ingredients.isEmpty()) {
             JsonArray arr = new JsonArray();
             for (String id : ingredients) {
                 arr.add(ingredientJson(id));
@@ -213,9 +220,24 @@ public final class RecipeBundleSplitter {
     private static void collectOutputIds(JsonObject obj, Set<String> out) {
         collectSelectLike(obj, "select", out);
         collectSelectLike(obj, "colors", out);
-        if (obj.has("produce")) {
-            collectProduce(obj.get("produce"), out);
+        collectIoField(obj, "produce", out);
+        collectIoField(obj, "output", out);
+        collectIoField(obj, "outputs", out);
+        collectIoField(obj, "result", out);
+    }
+
+    private static void collectInputAliases(JsonObject obj, Set<String> out) {
+        collectIoField(obj, "input", out);
+        collectIoField(obj, "inputs", out);
+        collectIoField(obj, "ingredient", out);
+    }
+
+    /** Top-level or nested I/O field: string, array, or object with id/item/tag/output. */
+    private static void collectIoField(JsonObject obj, String key, Set<String> out) {
+        if (!obj.has(key)) {
+            return;
         }
+        collectSelectorElement(obj.get(key), out);
     }
 
     private static void collectSelectLike(JsonObject obj, String key, Set<String> out) {
@@ -227,47 +249,11 @@ public final class RecipeBundleSplitter {
                 continue;
             }
             JsonObject row = el.getAsJsonObject();
-            String id = null;
-            if (row.has("output") && row.get("output").isJsonPrimitive()) {
-                id = row.get("output").getAsString();
-            } else if (row.has("id") && row.get("id").isJsonPrimitive()) {
-                id = row.get("id").getAsString();
-            }
-            if (id != null && !id.isBlank()) {
-                out.add(id.trim());
-            }
-        }
-    }
-
-    private static void collectProduce(JsonElement produce, Set<String> out) {
-        if (produce == null) {
-            return;
-        }
-        if (produce.isJsonPrimitive()) {
-            String id = produce.getAsString().trim();
-            if (!id.isEmpty()) {
-                out.add(id);
-            }
-            return;
-        }
-        if (produce.isJsonArray()) {
-            for (JsonElement el : produce.getAsJsonArray()) {
-                collectProduce(el, out);
-            }
-            return;
-        }
-        if (produce.isJsonObject()) {
-            JsonObject obj = produce.getAsJsonObject();
-            if (obj.has("id") && obj.get("id").isJsonPrimitive()) {
-                String id = obj.get("id").getAsString().trim();
-                if (!id.isEmpty()) {
-                    out.add(id);
-                }
-            } else if (obj.has("item") && obj.get("item").isJsonPrimitive()) {
-                String id = obj.get("item").getAsString().trim();
-                if (!id.isEmpty()) {
-                    out.add(id);
-                }
+            // Row-local output/id only (never entry metadata id at recipe root).
+            if (row.has("output")) {
+                collectSelectorElement(row.get("output"), out);
+            } else if (row.has("id")) {
+                collectSelectorElement(row.get("id"), out);
             }
         }
     }
@@ -277,36 +263,51 @@ public final class RecipeBundleSplitter {
             return;
         }
         for (JsonElement el : child.getAsJsonArray("require")) {
-            if (el == null) {
-                continue;
+            collectSelectorElement(el, out);
+        }
+    }
+
+    private static void collectSelectorElement(JsonElement el, Set<String> out) {
+        if (el == null || el.isJsonNull()) {
+            return;
+        }
+        if (el.isJsonPrimitive()) {
+            addMirrorable(el.getAsString(), out);
+            return;
+        }
+        if (el.isJsonArray()) {
+            for (JsonElement child : el.getAsJsonArray()) {
+                collectSelectorElement(child, out);
             }
-            if (el.isJsonPrimitive()) {
-                String id = el.getAsString().trim();
-                if (!id.isEmpty()) {
-                    out.add(id);
-                }
-                continue;
-            }
-            if (el.isJsonObject()) {
-                JsonObject row = el.getAsJsonObject();
-                if (row.has("id") && row.get("id").isJsonPrimitive()) {
-                    String id = row.get("id").getAsString().trim();
-                    if (!id.isEmpty()) {
-                        out.add(id);
-                    }
-                } else if (row.has("item") && row.get("item").isJsonPrimitive()) {
-                    String id = row.get("item").getAsString().trim();
-                    if (!id.isEmpty()) {
-                        out.add(id);
-                    }
-                } else if (row.has("tag") && row.get("tag").isJsonPrimitive()) {
-                    String tag = row.get("tag").getAsString().trim();
-                    if (!tag.isEmpty()) {
-                        out.add(tag.startsWith("#") ? tag : "#" + tag);
-                    }
+            return;
+        }
+        if (el.isJsonObject()) {
+            JsonObject obj = el.getAsJsonObject();
+            if (obj.has("output")) {
+                collectSelectorElement(obj.get("output"), out);
+            } else if (obj.has("id")) {
+                collectSelectorElement(obj.get("id"), out);
+            } else if (obj.has("item")) {
+                collectSelectorElement(obj.get("item"), out);
+            } else if (obj.has("tag") && obj.get("tag").isJsonPrimitive()) {
+                String tag = obj.get("tag").getAsString().trim();
+                if (!tag.isEmpty()) {
+                    addMirrorable(tag.startsWith("#") ? tag : "#" + tag, out);
                 }
             }
         }
+    }
+
+    /** Skip empty and Mek chemical {@code %} selectors (KubeJS item mirrors only). */
+    private static void addMirrorable(String raw, Set<String> out) {
+        if (raw == null) {
+            return;
+        }
+        String id = raw.trim();
+        if (id.isEmpty() || id.startsWith("%")) {
+            return;
+        }
+        out.add(id);
     }
 
     private record IndexedEntry(int index, JsonObject entry) {}

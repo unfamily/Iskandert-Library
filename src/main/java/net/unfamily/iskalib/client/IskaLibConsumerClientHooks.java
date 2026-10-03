@@ -7,11 +7,14 @@ import net.unfamily.iskalib.client.gas.IskaLibGasFluidModels;
 import net.unfamily.iskalib.client.liquid.IskaLibLiquidFluidModels;
 
 /**
- * Shared client hooks for consumer mods that register gases/liquids via iska_lib.
+ * Shared client hooks for gases/liquids registered via iska_lib.
  * <p>
- * RegisterFluidModelsEvent / BlockTintSources are posted to every mod bus with the
- * <strong>same</strong> event instance, so listeners must be attached only once
- * (otherwise fluid models register twice and throw).
+ * Prefer attaching from {@link net.unfamily.iskalib.IskaLib} only. Consumer
+ * {@code registerLiquid}/{@code registerGas} still call this for backwards
+ * compatibility, but listeners are wired at most once.
+ * <p>
+ * Handlers also use {@link OncePerEvent} because {@code IModBusEvent}s such as
+ * {@code RegisterFluidModelsEvent} are posted to every mod bus with the same instance.
  */
 public final class IskaLibConsumerClientHooks {
 
@@ -32,10 +35,15 @@ public final class IskaLibConsumerClientHooks {
 
     private static boolean isPhysicalClient() {
         try {
-            Class.forName("net.minecraft.client.Minecraft");
-            return true;
+            return net.neoforged.fml.loading.FMLEnvironment.getDist()
+                    == net.neoforged.api.distmarker.Dist.CLIENT;
         } catch (Throwable ignored) {
-            return false;
+            try {
+                Class.forName("net.minecraft.client.Minecraft");
+                return true;
+            } catch (Throwable ignored2) {
+                return false;
+            }
         }
     }
 }

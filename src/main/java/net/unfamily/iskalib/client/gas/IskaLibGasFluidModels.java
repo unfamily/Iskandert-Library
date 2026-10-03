@@ -12,6 +12,7 @@ import net.neoforged.neoforge.client.fluid.CustomFluidRenderer;
 import net.neoforged.neoforge.client.fluid.FluidTintSource;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.unfamily.iskalib.IskaLib;
+import net.unfamily.iskalib.client.OncePerEvent;
 import net.unfamily.iskalib.gas.GasRegistry;
 import net.unfamily.iskalib.gas.RegisteredGas;
 
@@ -31,6 +32,10 @@ public final class IskaLibGasFluidModels {
     private IskaLibGasFluidModels() {}
 
     public static void registerFluidModels(RegisterFluidModelsEvent event) {
+        // Same event instance is fanned out to every mod bus; register at most once.
+        if (!OncePerEvent.claim(IskaLibGasFluidModels.class, event)) {
+            return;
+        }
         for (RegisteredGas gas : GasRegistry.all()) {
             int stackTint = gas.tintArgb();
             FluidTintSource tint = new FluidTintSource() {
