@@ -13,17 +13,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Split recipe JSON bundles before KubeJS processes {@code RecipeManager.apply}.
- *
- * <p>KubeJS injects at HEAD with mixin priority 1100. For multiple HEAD injectors, a
- * <em>lower</em> mixin priority is applied later and therefore runs <em>earlier</em> at runtime.
- * Priority 900 makes this split run before KubeJS {@code ServerEvents.recipes} so
- * {@code event.remove({ id: '..._N' })} can see post-split ids.
+ * Split recipe JSON bundles at the start of {@code RecipeManager.apply}.
  *
  * <p>{@code remap = false}: NeoForge 1.21 uses Mojmap at runtime; Mixin AP cannot map {@code apply}
  * under MCP.
  */
-@Mixin(value = RecipeManager.class, priority = 900)
+@Mixin(RecipeManager.class)
 public abstract class RecipeManagerApplyMixin {
 
     @Inject(
