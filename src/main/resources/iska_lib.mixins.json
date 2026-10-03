@@ -4,8 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "refmap": "iska_lib.refmap.json",
   "mixins": [
-    "CauldronFluidContentMixin",
-    "RecipeManagerApplyMixin"
+    "CauldronFluidContentMixin"
   ],
   "client": [],
   "minVersion": "0.8"

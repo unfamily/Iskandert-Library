@@ -57,6 +57,7 @@ public class IskaLib {
         IskaLibCreativeTabs.registerIfNeeded(modEventBus);
         StageBootstrap.install();
         modEventBus.addListener(IskaLibGases::registerCapabilities);
+        modEventBus.addListener(net.unfamily.iskalib.crafting.RecipeBundleBridgeHooks::onAddPackFinders);
         NeoForge.EVENT_BUS.register(ExplosionSystem.class);
         ShopCurrencyCatalog.bootstrapFromJar();
         ShopCurrencyCatalog.installAsDefaultListener();
