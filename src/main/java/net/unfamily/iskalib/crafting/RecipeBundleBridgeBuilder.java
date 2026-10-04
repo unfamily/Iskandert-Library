@@ -83,6 +83,11 @@ public final class RecipeBundleBridgeBuilder {
     private static void scanModJars(Map<ResourceLocation, JsonElement> out) {
         for (IModFileInfo info : ModList.get().getModFiles()) {
             IModFile file = info.getFile();
+            // Prefer SecureJar / findResource("data"): getFilePath() in Gradle runs is often
+            // classes/java/main without resources, so Colossal bundles were never split.
+            if (scanModFileData(file, out)) {
+                continue;
+            }
             Path path = file.getFilePath();
             if (path == null) {
                 continue;
@@ -96,6 +101,30 @@ public final class RecipeBundleBridgeBuilder {
                 }
             }
         }
+    }
+
+    /** @return true if a data root was found and scanned (even if empty of recipes) */
+    private static boolean scanModFileData(IModFile file, Map<ResourceLocation, JsonElement> out) {
+        try {
+            Path data = file.findResource("data");
+            if (data != null && Files.isDirectory(data)) {
+                scanDataRootRecipes(data, out);
+                return true;
+            }
+        } catch (Exception ex) {
+            LOGGER.debug("Recipe bridge: findResource(data) failed for {}: {}", file.getFileName(), ex.toString());
+        }
+        try {
+            Path root = file.getSecureJar().getRootPath();
+            Path data = root.resolve("data");
+            if (Files.isDirectory(data)) {
+                scanDataRootRecipes(data, out);
+                return true;
+            }
+        } catch (Exception ex) {
+            LOGGER.debug("Recipe bridge: SecureJar data scan failed for {}: {}", file.getFileName(), ex.toString());
+        }
+        return false;
     }
 
     private static void scanBootstrapRoots(Map<ResourceLocation, JsonElement> out) {
