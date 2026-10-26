@@ -168,6 +168,16 @@ public final class MarkRenderer {
      * Filled AABB from inclusive {@code min} to inclusive {@code max} (one draw for many cells).
      */
     public void addOwnedBox(BlockPos owner, BlockPos min, BlockPos max, int color, int durationTicks, boolean throughWalls) {
+        addOwnedBox(owner, min, max, color, durationTicks, throughWalls, 0.0f);
+    }
+
+    /**
+     * Like {@link #addOwnedBox} but, when {@code min} and {@code max} share the same Y and
+     * {@code yCenteredThickness > 0}, draws a Y-centered slab of that thickness (in blocks)
+     * instead of a full-block-tall prism — e.g. thin turbine blades (~{@code 3/16}).
+     */
+    public void addOwnedBox(BlockPos owner, BlockPos min, BlockPos max, int color, int durationTicks,
+                            boolean throughWalls, float yCenteredThickness) {
         if (owner == null || min == null || max == null) {
             return;
         }
@@ -185,9 +195,10 @@ public final class MarkRenderer {
             int z1 = Math.max(min.getZ(), max.getZ());
             BlockPos lo = new BlockPos(x0, y0, z0);
             BlockPos hi = new BlockPos(x1, y1, z1);
+            float slab = yCenteredThickness > 0.0f && y0 == y1 ? yCenteredThickness : 0.0f;
             ownedBoxesByOwner
                     .computeIfAbsent(owner.immutable(), k -> new CopyOnWriteArrayList<>())
-                    .add(new MarkBoxData(lo, hi, color, expire, throughWalls));
+                    .add(new MarkBoxData(lo, hi, color, expire, throughWalls, slab));
         };
         if (mc.level == null) {
             mc.execute(add);
@@ -375,7 +386,7 @@ public final class MarkRenderer {
                 if (box.throughWalls != throughWallsPass) {
                     continue;
                 }
-                drawFilledBox(bufferBuilder, pose, box.min, box.max, box.color);
+                drawFilledBox(bufferBuilder, pose, box.min, box.max, box.color, box.yCenteredThickness);
                 hasVertices = true;
             }
         }
@@ -524,14 +535,23 @@ public final class MarkRenderer {
 
     /** Inclusive block corners; inset 1/16 to reduce z-fight with solids. */
     private static void drawFilledBox(BufferBuilder bufferBuilder, PoseStack.Pose pose,
-                                      BlockPos min, BlockPos max, int color) {
+                                      BlockPos min, BlockPos max, int color, float yCenteredThickness) {
         float inset = 1.0f / 16.0f;
         float x0 = min.getX() + inset;
-        float y0 = min.getY() + inset;
         float z0 = min.getZ() + inset;
         float x1 = max.getX() + 1.0f - inset;
-        float y1 = max.getY() + 1.0f - inset;
         float z1 = max.getZ() + 1.0f - inset;
+        float y0;
+        float y1;
+        if (yCenteredThickness > 0.0f && min.getY() == max.getY()) {
+            float cy = min.getY() + 0.5f;
+            float half = yCenteredThickness * 0.5f;
+            y0 = cy - half;
+            y1 = cy + half;
+        } else {
+            y0 = min.getY() + inset;
+            y1 = max.getY() + 1.0f - inset;
+        }
         emitBoxQuads(bufferBuilder, pose, x0, y0, z0, x1, y1, z1, color);
     }
 
@@ -597,13 +617,17 @@ public final class MarkRenderer {
         final int color;
         final long expirationTime;
         final boolean throughWalls;
+        /** {@code > 0} and single-Y AABB → draw as Y-centered slab of this thickness (blocks). */
+        final float yCenteredThickness;
 
-        MarkBoxData(BlockPos min, BlockPos max, int color, long expirationTime, boolean throughWalls) {
+        MarkBoxData(BlockPos min, BlockPos max, int color, long expirationTime, boolean throughWalls,
+                    float yCenteredThickness) {
             this.min = min;
             this.max = max;
             this.color = color;
             this.expirationTime = expirationTime;
             this.throughWalls = throughWalls;
+            this.yCenteredThickness = yCenteredThickness;
         }
     }
 }
