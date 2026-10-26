@@ -29,10 +29,10 @@ public final class InsetAreaBorderRenderer {
     private static final float BORDER_THICKNESS = 6.0f / 16.0f;
 
     /**
-     * Pull the outer hull slightly inside the inclusive block AABB so the border is not
-     * coplanar with shell faces (that z-fight reads as a ~0.01 outward perimeter shift).
+     * Expand the outer hull slightly past the inclusive block AABB so the border sits
+     * just outside shell faces (avoids coplanar z-fight without hiding the frame).
      */
-    private static final float HULL_INSET = 0.01f;
+    private static final float HULL_OUTSET = 0.01f;
 
     private static final InsetAreaBorderRenderer INSTANCE = new InsetAreaBorderRenderer();
     private final Map<Object, InsetBorder> borders = new ConcurrentHashMap<>();
@@ -113,12 +113,12 @@ public final class InsetAreaBorderRenderer {
 
     private static void drawInsetEdgeBox(PoseStack poseStack, VertexConsumer consumer,
                                          BlockPos a, BlockPos b, int color) {
-        float minX = Math.min(a.getX(), b.getX()) + HULL_INSET;
-        float minY = Math.min(a.getY(), b.getY()) + HULL_INSET;
-        float minZ = Math.min(a.getZ(), b.getZ()) + HULL_INSET;
-        float maxX = Math.max(a.getX(), b.getX()) + 1 - HULL_INSET;
-        float maxY = Math.max(a.getY(), b.getY()) + 1 - HULL_INSET;
-        float maxZ = Math.max(a.getZ(), b.getZ()) + 1 - HULL_INSET;
+        float minX = Math.min(a.getX(), b.getX()) - HULL_OUTSET;
+        float minY = Math.min(a.getY(), b.getY()) - HULL_OUTSET;
+        float minZ = Math.min(a.getZ(), b.getZ()) - HULL_OUTSET;
+        float maxX = Math.max(a.getX(), b.getX()) + 1 + HULL_OUTSET;
+        float maxY = Math.max(a.getY(), b.getY()) + 1 + HULL_OUTSET;
+        float maxZ = Math.max(a.getZ(), b.getZ()) + 1 + HULL_OUTSET;
 
         float t = Math.min(BORDER_THICKNESS, Math.min((maxX - minX) * 0.5f,
                 Math.min((maxY - minY) * 0.5f, (maxZ - minZ) * 0.5f)));
