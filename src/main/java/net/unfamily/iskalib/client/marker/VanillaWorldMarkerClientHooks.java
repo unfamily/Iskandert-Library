@@ -38,6 +38,7 @@ public final class VanillaWorldMarkerClientHooks {
     public static void onRenderLevelAfterTranslucent(RenderLevelStageEvent.AfterTranslucentBlocks event) {
         float partialTick = Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(true);
         AreaBorderRenderer.getInstance().render(event);
+        InsetAreaBorderRenderer.getInstance().render(event);
         MarkRenderer.getInstance().renderWorldMarkers(partialTick);
     }
 }
