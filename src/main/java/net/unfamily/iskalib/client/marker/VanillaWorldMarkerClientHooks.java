@@ -33,6 +33,7 @@ public final class VanillaWorldMarkerClientHooks {
             return;
         }
         AreaBorderRenderer.getInstance().render(event);
+        InsetAreaBorderRenderer.getInstance().render(event);
         MarkRenderer.getInstance().render(event.getPoseStack(), 0.0f);
     }
 }

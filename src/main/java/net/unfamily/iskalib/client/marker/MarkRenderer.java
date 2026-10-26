@@ -24,9 +24,10 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Renderer for visible blocks through walls
@@ -37,7 +38,9 @@ public class MarkRenderer {
     private final Map<BlockPos, MarkBlockData> highlightedBlocks = new ConcurrentHashMap<>();
     private final Map<BlockPos, MarkBlockData> billboardMarkers = new ConcurrentHashMap<>();
     private final Map<BlockPos, Map<BlockPos, MarkBlockData>> billboardMarkersByOwner = new ConcurrentHashMap<>();
-    
+    /** Multi-block filled boxes keyed by owner (list so multiple boxes may share a min corner). */
+    private final Map<BlockPos, List<MarkBoxData>> ownedBoxesByOwner = new ConcurrentHashMap<>();
+
     private MarkRenderer() {}
     
     public static MarkRenderer getInstance() {
@@ -108,7 +111,9 @@ public class MarkRenderer {
 
     public void clearBillboardMarkersForOwner(BlockPos owner) {
         if (owner != null) {
-            billboardMarkersByOwner.remove(owner.immutable());
+            BlockPos key = owner.immutable();
+            billboardMarkersByOwner.remove(key);
+            ownedBoxesByOwner.remove(key);
         }
     }
 
@@ -126,6 +131,10 @@ public class MarkRenderer {
     }
 
     public void addBillboardMarker(BlockPos owner, BlockPos pos, int color, int durationTicks) {
+        addBillboardMarker(owner, pos, color, durationTicks, true);
+    }
+
+    public void addBillboardMarker(BlockPos owner, BlockPos pos, int color, int durationTicks, boolean throughWalls) {
         if (owner == null || owner.equals(BlockPos.ZERO)) {
             addBillboardMarker(pos, color, durationTicks);
             return;
@@ -138,7 +147,36 @@ public class MarkRenderer {
             long expire = expirationTime(mc, durationTicks);
             billboardMarkersByOwner
                     .computeIfAbsent(owner.immutable(), k -> new ConcurrentHashMap<>())
-                    .put(pos.immutable(), new MarkBlockData(color, expire, true));
+                    .put(pos.immutable(), new MarkBlockData(color, expire, true, throughWalls));
+        };
+        if (mc.level == null) {
+            mc.execute(add);
+        } else {
+            add.run();
+        }
+    }
+
+    public void addOwnedBox(BlockPos owner, BlockPos min, BlockPos max, int color, int durationTicks, boolean throughWalls) {
+        if (owner == null || min == null || max == null || owner.equals(BlockPos.ZERO)) {
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        Runnable add = () -> {
+            if (mc.level == null) {
+                return;
+            }
+            long expire = expirationTime(mc, durationTicks);
+            int x0 = Math.min(min.getX(), max.getX());
+            int y0 = Math.min(min.getY(), max.getY());
+            int z0 = Math.min(min.getZ(), max.getZ());
+            int x1 = Math.max(min.getX(), max.getX());
+            int y1 = Math.max(min.getY(), max.getY());
+            int z1 = Math.max(min.getZ(), max.getZ());
+            BlockPos lo = new BlockPos(x0, y0, z0);
+            BlockPos hi = new BlockPos(x1, y1, z1);
+            ownedBoxesByOwner
+                    .computeIfAbsent(owner.immutable(), k -> new CopyOnWriteArrayList<>())
+                    .add(new MarkBoxData(lo, hi, color, expire, throughWalls));
         };
         if (mc.level == null) {
             mc.execute(add);
@@ -159,7 +197,7 @@ public class MarkRenderer {
         long expire = expirationTime(mc, durationTicks);
         billboardMarkersByOwner
                 .computeIfAbsent(owner.immutable(), k -> new ConcurrentHashMap<>())
-                .put(pos.immutable(), new MarkBlockData(color, expire, true, text));
+                .put(pos.immutable(), new MarkBlockData(color, expire, true, true, text));
     }
 
     private static long expirationTime(Minecraft mc, int durationTicks) {
@@ -187,6 +225,7 @@ public class MarkRenderer {
         highlightedBlocks.clear();
         billboardMarkers.clear();
         billboardMarkersByOwner.clear();
+        ownedBoxesByOwner.clear();
     }
     
     /**
@@ -381,7 +420,8 @@ public class MarkRenderer {
     public void render(PoseStack poseStack, float partialTick) {
         // Area borders require RenderLevelStageEvent — see VanillaWorldMarkerClientHooks.
 
-        if (highlightedBlocks.isEmpty() && billboardMarkers.isEmpty() && billboardMarkersByOwner.isEmpty()) {
+        if (highlightedBlocks.isEmpty() && billboardMarkers.isEmpty()
+                && billboardMarkersByOwner.isEmpty() && ownedBoxesByOwner.isEmpty()) {
             return;
         }
         
@@ -396,6 +436,7 @@ public class MarkRenderer {
             BlockState state = mc.level.getBlockState(entry.getKey());
             return state.isAir();
         });
+        ownedBoxesByOwner.entrySet().removeIf(entry -> mc.level.getBlockState(entry.getKey()).isAir());
         
         // Remove expired blocks - usando removeIf che è thread-safe su ConcurrentHashMap
         highlightedBlocks.entrySet().removeIf(entry -> entry.getValue().expirationTime <= currentTime);
@@ -405,8 +446,12 @@ public class MarkRenderer {
         billboardMarkersByOwner.values().forEach(map ->
                 map.entrySet().removeIf(entry -> entry.getValue().expirationTime <= currentTime));
         billboardMarkersByOwner.entrySet().removeIf(e -> e.getValue().isEmpty());
+        ownedBoxesByOwner.values().forEach(list ->
+                list.removeIf(box -> box.expirationTime <= currentTime));
+        ownedBoxesByOwner.entrySet().removeIf(e -> e.getValue().isEmpty());
         
-        if (highlightedBlocks.isEmpty() && billboardMarkers.isEmpty() && billboardMarkersByOwner.isEmpty()) {
+        if (highlightedBlocks.isEmpty() && billboardMarkers.isEmpty()
+                && billboardMarkersByOwner.isEmpty() && ownedBoxesByOwner.isEmpty()) {
             return;
         }
         
@@ -426,15 +471,21 @@ public class MarkRenderer {
             renderBillboardMarkers(poseStack, mc, cameraPos, currentTime);
         }
 
-        if (!billboardMarkersByOwner.isEmpty()) {
-            renderOwnedBillboardMarkers(poseStack, mc, cameraPos);
+        if (!billboardMarkersByOwner.isEmpty() || !ownedBoxesByOwner.isEmpty()) {
+            renderOwnedMarkers(poseStack, mc, cameraPos, true);
+            renderOwnedMarkers(poseStack, mc, cameraPos, false);
         }
     }
 
-    private void renderOwnedBillboardMarkers(PoseStack poseStack, Minecraft mc, Vec3 cameraPos) {
+    private void renderOwnedMarkers(PoseStack poseStack, Minecraft mc, Vec3 cameraPos, boolean throughWallsPass) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.disableDepthTest();
+        if (throughWallsPass) {
+            RenderSystem.disableDepthTest();
+        } else {
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthMask(false);
+        }
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
         Tesselator tesselator = Tesselator.getInstance();
@@ -444,7 +495,19 @@ public class MarkRenderer {
 
         for (Map<BlockPos, MarkBlockData> worldMarkers : billboardMarkersByOwner.values()) {
             for (Map.Entry<BlockPos, MarkBlockData> entry : worldMarkers.entrySet()) {
+                if (entry.getValue().throughWalls != throughWallsPass) {
+                    continue;
+                }
                 drawSmallCube(bufferBuilder, matrix, entry.getKey(), cameraPos, entry.getValue().color);
+                hasVertices = true;
+            }
+        }
+        for (List<MarkBoxData> boxes : ownedBoxesByOwner.values()) {
+            for (MarkBoxData box : boxes) {
+                if (box.throughWalls != throughWallsPass) {
+                    continue;
+                }
+                drawFilledBox(bufferBuilder, matrix, box.min, box.max, cameraPos, box.color);
                 hasVertices = true;
             }
         }
@@ -453,6 +516,7 @@ public class MarkRenderer {
             BufferUploader.drawWithShader(bufferBuilder.buildOrThrow());
         }
 
+        RenderSystem.depthMask(true);
         RenderSystem.enableDepthTest();
         RenderSystem.disableBlend();
     }
@@ -661,34 +725,90 @@ public class MarkRenderer {
         bufferBuilder.addVertex(x + 1, y, z + 1).setColor(red, green, blue, alpha);
     }
     
-    /**
-     * Class to store the data of a highlighted block
-     */
+    private void drawFilledBox(BufferBuilder bufferBuilder, Matrix4f matrix, BlockPos min, BlockPos max,
+                               Vec3 cameraPos, int color) {
+        float inset = 1.0f / 16.0f;
+        float x0 = min.getX() + inset - (float) cameraPos.x;
+        float y0 = min.getY() + inset - (float) cameraPos.y;
+        float z0 = min.getZ() + inset - (float) cameraPos.z;
+        float x1 = max.getX() + 1.0f - inset - (float) cameraPos.x;
+        float y1 = max.getY() + 1.0f - inset - (float) cameraPos.y;
+        float z1 = max.getZ() + 1.0f - inset - (float) cameraPos.z;
+        float red = ((color >> 16) & 0xFF) / 255.0F;
+        float green = ((color >> 8) & 0xFF) / 255.0F;
+        float blue = (color & 0xFF) / 255.0F;
+        float alpha = ((color >> 24) & 0xFF) / 255.0F;
+        bufferBuilder.addVertex(x0, y0, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y0, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y0, z1).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x0, y0, z1).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x0, y1, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x0, y1, z1).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y1, z1).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y1, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x0, y0, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x0, y1, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y1, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y0, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x0, y0, z1).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y0, z1).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y1, z1).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x0, y1, z1).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x0, y0, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x0, y0, z1).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x0, y1, z1).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x0, y1, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y0, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y1, z0).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y1, z1).setColor(red, green, blue, alpha);
+        bufferBuilder.addVertex(x1, y0, z1).setColor(red, green, blue, alpha);
+    }
+
     private static class MarkBlockData {
         final int color;
         final long expirationTime;
         final boolean isSmallCube;
+        final boolean throughWalls;
         final String text;
         
         MarkBlockData(int color, long expirationTime) {
-            this.color = color;
-            this.expirationTime = expirationTime;
-            this.isSmallCube = false;
-            this.text = null;
+            this(color, expirationTime, false, true, null);
         }
         
         MarkBlockData(int color, long expirationTime, boolean isSmallCube) {
-            this.color = color;
-            this.expirationTime = expirationTime;
-            this.isSmallCube = isSmallCube;
-            this.text = null;
+            this(color, expirationTime, isSmallCube, true, null);
+        }
+
+        MarkBlockData(int color, long expirationTime, boolean isSmallCube, boolean throughWalls) {
+            this(color, expirationTime, isSmallCube, throughWalls, null);
         }
         
         MarkBlockData(int color, long expirationTime, boolean isSmallCube, String text) {
+            this(color, expirationTime, isSmallCube, true, text);
+        }
+
+        MarkBlockData(int color, long expirationTime, boolean isSmallCube, boolean throughWalls, String text) {
             this.color = color;
             this.expirationTime = expirationTime;
             this.isSmallCube = isSmallCube;
+            this.throughWalls = throughWalls;
             this.text = text;
+        }
+    }
+
+    private static class MarkBoxData {
+        final BlockPos min;
+        final BlockPos max;
+        final int color;
+        final long expirationTime;
+        final boolean throughWalls;
+
+        MarkBoxData(BlockPos min, BlockPos max, int color, long expirationTime, boolean throughWalls) {
+            this.min = min;
+            this.max = max;
+            this.color = color;
+            this.expirationTime = expirationTime;
+            this.throughWalls = throughWalls;
         }
     }
 } 
