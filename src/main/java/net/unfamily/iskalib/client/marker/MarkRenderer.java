@@ -157,6 +157,15 @@ public class MarkRenderer {
     }
 
     public void addOwnedBox(BlockPos owner, BlockPos min, BlockPos max, int color, int durationTicks, boolean throughWalls) {
+        addOwnedBox(owner, min, max, color, durationTicks, throughWalls, 0.0f);
+    }
+
+    /**
+     * Like {@link #addOwnedBox} but, when {@code min}/{@code max} share Y and
+     * {@code yCenteredThickness > 0}, draws a Y-centered slab (thin blades).
+     */
+    public void addOwnedBox(BlockPos owner, BlockPos min, BlockPos max, int color, int durationTicks,
+                            boolean throughWalls, float yCenteredThickness) {
         if (owner == null || min == null || max == null || owner.equals(BlockPos.ZERO)) {
             return;
         }
@@ -174,9 +183,10 @@ public class MarkRenderer {
             int z1 = Math.max(min.getZ(), max.getZ());
             BlockPos lo = new BlockPos(x0, y0, z0);
             BlockPos hi = new BlockPos(x1, y1, z1);
+            float slab = yCenteredThickness > 0.0f && y0 == y1 ? yCenteredThickness : 0.0f;
             ownedBoxesByOwner
                     .computeIfAbsent(owner.immutable(), k -> new CopyOnWriteArrayList<>())
-                    .add(new MarkBoxData(lo, hi, color, expire, throughWalls));
+                    .add(new MarkBoxData(lo, hi, color, expire, throughWalls, slab));
         };
         if (mc.level == null) {
             mc.execute(add);
@@ -507,7 +517,7 @@ public class MarkRenderer {
                 if (box.throughWalls != throughWallsPass) {
                     continue;
                 }
-                drawFilledBox(bufferBuilder, matrix, box.min, box.max, cameraPos, box.color);
+                drawFilledBox(bufferBuilder, matrix, box.min, box.max, cameraPos, box.color, box.yCenteredThickness);
                 hasVertices = true;
             }
         }
@@ -726,14 +736,23 @@ public class MarkRenderer {
     }
     
     private void drawFilledBox(BufferBuilder bufferBuilder, Matrix4f matrix, BlockPos min, BlockPos max,
-                               Vec3 cameraPos, int color) {
+                               Vec3 cameraPos, int color, float yCenteredThickness) {
         float inset = 1.0f / 16.0f;
         float x0 = min.getX() + inset - (float) cameraPos.x;
-        float y0 = min.getY() + inset - (float) cameraPos.y;
         float z0 = min.getZ() + inset - (float) cameraPos.z;
         float x1 = max.getX() + 1.0f - inset - (float) cameraPos.x;
-        float y1 = max.getY() + 1.0f - inset - (float) cameraPos.y;
         float z1 = max.getZ() + 1.0f - inset - (float) cameraPos.z;
+        float y0;
+        float y1;
+        if (yCenteredThickness > 0.0f && min.getY() == max.getY()) {
+            float cy = min.getY() + 0.5f - (float) cameraPos.y;
+            float half = yCenteredThickness * 0.5f;
+            y0 = cy - half;
+            y1 = cy + half;
+        } else {
+            y0 = min.getY() + inset - (float) cameraPos.y;
+            y1 = max.getY() + 1.0f - inset - (float) cameraPos.y;
+        }
         float red = ((color >> 16) & 0xFF) / 255.0F;
         float green = ((color >> 8) & 0xFF) / 255.0F;
         float blue = (color & 0xFF) / 255.0F;
@@ -802,13 +821,16 @@ public class MarkRenderer {
         final int color;
         final long expirationTime;
         final boolean throughWalls;
+        final float yCenteredThickness;
 
-        MarkBoxData(BlockPos min, BlockPos max, int color, long expirationTime, boolean throughWalls) {
+        MarkBoxData(BlockPos min, BlockPos max, int color, long expirationTime, boolean throughWalls,
+                    float yCenteredThickness) {
             this.min = min;
             this.max = max;
             this.color = color;
             this.expirationTime = expirationTime;
             this.throughWalls = throughWalls;
+            this.yCenteredThickness = yCenteredThickness;
         }
     }
 } 
