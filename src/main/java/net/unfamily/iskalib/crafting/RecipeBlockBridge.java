@@ -1,10 +1,9 @@
 package net.unfamily.iskalib.crafting;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,14 +16,14 @@ import org.jetbrains.annotations.Nullable;
  * Default with no providers: not blocked. Retrocompatible — does not alter recipe loading.
  * <p>
  * With providers registered: missing owner ({@code ownerUuid == null}) is blocked by the bridge
- * without consulting providers. With a present UUID (online or offline), providers decide;
- * an online {@link ServerPlayer} is passed as optional context when available.
+ * without consulting providers. With a present UUID (online or offline), providers decide via
+ * {@link Provider#isBlocked(Identifier, UUID, Level, ServerPlayer)}; {@code onlinePlayer} may be
+ * null when the owner is offline.
  */
 public final class RecipeBlockBridge {
     public interface Provider {
         /**
          * Primary gate for a known owner UUID (online or offline).
-         * Default delegates to the deprecated {@link ServerPlayer} overload (legacy behavior).
          * Called only when {@code ownerUuid} is non-null.
          *
          * @param recipeId     definitive RecipeManager id ({@code namespace:path_N} after bundle split)
@@ -33,13 +32,11 @@ public final class RecipeBlockBridge {
          * @param onlinePlayer owner when currently online; may be null if offline
          * @return true if this provider blocks the recipe for the given context
          */
-        default boolean isBlocked(
+        boolean isBlocked(
                 Identifier recipeId,
                 @Nullable UUID ownerUuid,
                 @Nullable Level level,
-                @Nullable ServerPlayer onlinePlayer) {
-            return isBlocked(recipeId, onlinePlayer, level);
-        }
+                @Nullable ServerPlayer onlinePlayer);
 
         /**
          * @param recipeId definitive RecipeManager id ({@code namespace:path_N} after bundle split)
@@ -49,10 +46,14 @@ public final class RecipeBlockBridge {
          * @deprecated Prefer {@link #isBlocked(Identifier, UUID, Level, ServerPlayer)}.
          */
         @Deprecated
-        boolean isBlocked(Identifier recipeId, @Nullable ServerPlayer player, @Nullable Level level);
+        default boolean isBlocked(
+                Identifier recipeId, @Nullable ServerPlayer player, @Nullable Level level) {
+            UUID ownerUuid = player != null ? player.getUUID() : null;
+            return isBlocked(recipeId, ownerUuid, level, player);
+        }
     }
 
-    private static final List<Provider> PROVIDERS = Collections.synchronizedList(new ArrayList<>());
+    private static final List<Provider> PROVIDERS = new CopyOnWriteArrayList<>();
 
     private RecipeBlockBridge() {}
 
