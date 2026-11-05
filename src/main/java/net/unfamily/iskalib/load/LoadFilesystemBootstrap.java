@@ -27,9 +27,13 @@ import java.util.stream.Stream;
  * Reads {@code data/<ns>/load/…} (and sidecar dirs) from disk before a {@link
  * net.minecraft.server.packs.resources.ResourceManager} exists.
  * <p>
- * Roots come from {@link IskaLibConfig#BOOTSTRAP_DATAPACK_PATHS} (KubeJS data root, Open Loader,
- * Global Packs, instance datapacks). Pack folders and {@code .zip}/{@code .jar} are read in-place
- * without extraction.
+ * This is the shared workaround for client/startup loading after Mojang made datapacks
+ * server-oriented: dependent mods must use these helpers (and optionally
+ * {@link BootstrapDatapackLoads}) instead of hardcoding {@code kubejs/data} / {@code datapacks}.
+ * <p>
+ * Roots come from the single Library config list {@link IskaLibConfig#BOOTSTRAP_DATAPACK_PATHS}
+ * (KubeJS data root, Open Loader, Global Packs, instance datapacks). Pack folders and
+ * {@code .zip}/{@code .jar} are read in-place without extraction.
  */
 public final class LoadFilesystemBootstrap {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoadFilesystemBootstrap.class);
