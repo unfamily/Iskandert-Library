@@ -54,6 +54,7 @@ public class IskaLib {
         LiquidJsonLoader.bootstrapAndRegister(true);
         GasJsonLoader.bootstrapAndRegister(true);
         ToolBehaviorLoader.loadAllBootstrap();
+        net.unfamily.iskalib.load.BootstrapDatapackLoads.flush();
         IskaLibCreativeTabs.registerIfNeeded(modEventBus);
         StageBootstrap.install();
         modEventBus.addListener(IskaLibGases::registerCapabilities);

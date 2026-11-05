@@ -77,9 +77,42 @@ public final class IskaLibConfig {
 
     static {
         BUILDER.pop();
+        BUILDER.comment(
+                        "Sticky / crude fluid movement effects.",
+                        "Entries are fluid ids (namespace:path) or tags (#namespace:path).",
+                        "Sticky fluids slow entities; crude oils fire Library events (mods may award advancements).")
+                .push("sticky_fluids");
+    }
+
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> STICKY_FLUIDS = BUILDER
+            .comment("Fluids that apply sticky slowdown while an entity stands in them.")
+            .defineList(
+                    "sticky_fluids",
+                    List.of("#c:oil", "#c:crude_oil"),
+                    obj -> obj instanceof String s && !s.isBlank());
+
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> CRUDE_OILS = BUILDER
+            .comment("Fluids treated as crude oil (fires StickyFluidEvents.InCrudeOil for integrations).")
+            .defineList(
+                    "crude_oils",
+                    List.of("#c:oil", "#c:crude_oil"),
+                    obj -> obj instanceof String s && !s.isBlank());
+
+    static {
+        BUILDER.pop();
     }
 
     public static final ModConfigSpec SPEC = BUILDER.build();
+
+    /** Sticky fluid list safe before COMMON config is loaded. */
+    public static List<? extends String> resolveStickyFluids() {
+        return SPEC.isLoaded() ? STICKY_FLUIDS.get() : STICKY_FLUIDS.getDefault();
+    }
+
+    /** Crude oil list safe before COMMON config is loaded. */
+    public static List<? extends String> resolveCrudeOils() {
+        return SPEC.isLoaded() ? CRUDE_OILS.get() : CRUDE_OILS.getDefault();
+    }
 
     /**
      * Safe for mod-construction bootstrap: NeoForge has not loaded COMMON config yet, so {@link
