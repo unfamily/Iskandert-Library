@@ -109,9 +109,7 @@ public final class RecipeBundleSplitter {
 
             K parentKey = entry.getKey();
             String parentId = keyToString.apply(parentKey);
-            recipeJsons.remove(parentKey);
-            splitFiles++;
-
+            int inserted = 0;
             for (IndexedEntry indexed : bundled) {
                 String childId = parentId + "_" + indexed.index();
                 K childKey;
@@ -129,7 +127,17 @@ public final class RecipeBundleSplitter {
                 child.addProperty("type", type);
                 injectKubeMatchFields(child);
                 recipeJsons.put(childKey, child);
-                childCount++;
+                inserted++;
+            }
+            if (inserted > 0) {
+                recipeJsons.remove(parentKey);
+                splitFiles++;
+                childCount += inserted;
+            } else {
+                LOGGER.warn(
+                        "Recipe bundle split: no valid children for {}; leaving parent in place",
+                        parentId);
+                injectKubeMatchFields(root);
             }
         }
 
@@ -181,7 +189,6 @@ public final class RecipeBundleSplitter {
             return 0;
         }
 
-        recipeJsons.remove(parentKey);
         int childCount = 0;
         for (JsonObject coil : coilObjects) {
             if (!coil.has("id") || !coil.get("id").isJsonPrimitive()) {
@@ -236,6 +243,14 @@ public final class RecipeBundleSplitter {
                 recipeJsons.put(childKey, child);
                 childCount++;
             }
+        }
+        if (childCount > 0) {
+            recipeJsons.remove(parentKey);
+        } else {
+            LOGGER.warn(
+                    "Heating coil split: no valid children for {}; leaving parent in place",
+                    parentId);
+            injectKubeMatchFields(root);
         }
         return childCount;
     }
