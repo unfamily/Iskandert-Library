@@ -4,7 +4,10 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -13,11 +16,15 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.scores.Scoreboard;
 import net.minecraft.world.scores.criteria.ObjectiveCriteria;
 import net.unfamily.iskalib.team.ShopTeamManager;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 
 
@@ -103,6 +110,85 @@ public class StageRegistry {
             return false; // Player not in a team
         }
         return hasTeamStage(teamName, stage);
+    }
+
+    /**
+     * Player stage check for online or offline owners (reads {@code playerdata/<uuid>.dat} when offline).
+     */
+    public boolean hasPlayerStage(@Nullable UUID ownerUuid, String stage) {
+        if (ownerUuid == null || stage == null || stage.isEmpty()) {
+            return false;
+        }
+        ServerPlayer online = server.getPlayerList().getPlayer(ownerUuid);
+        if (online != null) {
+            return hasPlayerStage(online, stage);
+        }
+        return offlinePlayerHasStage(ownerUuid, stage);
+    }
+
+    /**
+     * Team stage check for online or offline owners (team membership from {@link ShopTeamManager}).
+     */
+    public boolean hasPlayerTeamStage(@Nullable UUID ownerUuid, String stage) {
+        if (ownerUuid == null || stage == null || stage.isEmpty()) {
+            return false;
+        }
+        ServerPlayer online = server.getPlayerList().getPlayer(ownerUuid);
+        if (online != null) {
+            return hasPlayerTeamStage(online, stage);
+        }
+        ServerLevel overworld = server.getLevel(Level.OVERWORLD);
+        if (overworld == null) {
+            return false;
+        }
+        String teamName = ShopTeamManager.getInstance(overworld).getPlayerTeam(ownerUuid);
+        if (teamName == null) {
+            return false;
+        }
+        return hasTeamStage(teamName, stage);
+    }
+
+    private boolean offlinePlayerHasStage(UUID ownerUuid, String stage) {
+        ListTag stages = loadOfflinePlayerStageList(ownerUuid);
+        if (stages == null) {
+            return false;
+        }
+        for (int i = 0; i < stages.size(); i++) {
+            if (stages.getString(i).equals(stage)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Nullable
+    private ListTag loadOfflinePlayerStageList(UUID ownerUuid) {
+        Path path = server.getWorldPath(LevelResource.PLAYER_DATA_DIR).resolve(ownerUuid + ".dat");
+        if (!Files.isRegularFile(path)) {
+            return null;
+        }
+        try {
+            CompoundTag root = NbtIo.readCompressed(path, NbtAccounter.unlimitedHeap());
+            CompoundTag persistent;
+            if (root.contains("NeoForgeData", Tag.TAG_COMPOUND)) {
+                persistent = root.getCompound("NeoForgeData");
+            } else if (root.contains("ForgeData", Tag.TAG_COMPOUND)) {
+                persistent = root.getCompound("ForgeData");
+            } else {
+                return null;
+            }
+            if (!persistent.contains("iskautils", Tag.TAG_COMPOUND)) {
+                return null;
+            }
+            CompoundTag iska = persistent.getCompound("iskautils");
+            if (!iska.contains("stages", Tag.TAG_LIST)) {
+                return null;
+            }
+            return iska.getList("stages", Tag.TAG_STRING);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to read offline player stages for {}: {}", ownerUuid, e.toString());
+            return null;
+        }
     }
     
     /**
