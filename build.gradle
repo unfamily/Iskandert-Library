@@ -37,6 +37,10 @@ base {
     archivesName = mod_id
 }
 
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+}
+
 // Mojang ships Java 25 to end users in 26.1.2, so mods should target Java 25.
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
@@ -99,6 +103,8 @@ configurations {
 
 dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.7:processor'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     // Specify the version of Minecraft to use.
     // Depending on the plugin applied there are several options. We will assume you applied the userdev plugin as shown above.

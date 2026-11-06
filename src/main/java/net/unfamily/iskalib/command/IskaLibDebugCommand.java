@@ -25,7 +25,7 @@ import java.net.URI;
  */
 public final class IskaLibDebugCommand {
 
-    private static final String WIKI_URL = "https://github.com/unfamily/iskandert_utilities/wiki";
+    private static final String WIKI_URL = "https://www.anothermoddevwiki.eu/";
 
     private IskaLibDebugCommand() {}
 
