@@ -4,6 +4,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.packs.resources.ResourceManager;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,8 +58,15 @@ public final class StageBootstrap {
             }
         });
         StageActionsLoader.scanConfigDirectory();
-        StageItemEvents.initialize();
+        // Another Stages owns item gating when present (avoids double-filter).
+        if (!isAnotherStagesLoaded()) {
+            StageItemEvents.initialize();
+        }
         LOGGER.info("Library stage loaders installed");
+    }
+
+    private static boolean isAnotherStagesLoaded() {
+        return ModList.get().isLoaded("another_stages");
     }
 
     private static Collection<String> collectKnownStages() {
@@ -70,7 +78,9 @@ public final class StageBootstrap {
                 }
             }
         }
-        stages.addAll(StageItemHandler.collectReferencedStages());
+        if (!isAnotherStagesLoaded()) {
+            stages.addAll(StageItemHandler.collectReferencedStages());
+        }
         return stages;
     }
 
@@ -78,8 +88,13 @@ public final class StageBootstrap {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         ResourceManager rm = server != null ? server.getResourceManager() : null;
         StageActionsLoader.loadAll(rm);
-        StageItemHandler.loadAll(rm);
-        LOGGER.info("Reloaded stage actions ({}) and stage items", StageActionsLoader.getActionIds().size());
+        if (!isAnotherStagesLoaded()) {
+            StageItemHandler.loadAll(rm);
+            LOGGER.info("Reloaded stage actions ({}) and stage items", StageActionsLoader.getActionIds().size());
+        } else {
+            LOGGER.info("Reloaded stage actions ({}); item restrictions owned by Another Stages",
+                    StageActionsLoader.getActionIds().size());
+        }
         return 1;
     }
 }

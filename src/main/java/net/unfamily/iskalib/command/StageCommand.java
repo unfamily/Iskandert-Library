@@ -20,7 +20,6 @@ import net.minecraft.server.permissions.Permission;
 import net.minecraft.server.permissions.PermissionLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
-import net.unfamily.iskalib.stage.StageActionHooks;
 import net.unfamily.iskalib.stage.StageCatalog;
 import net.unfamily.iskalib.stage.StageRegistry;
 import net.unfamily.iskalib.stage.StageReloadHooks;
@@ -78,7 +77,6 @@ public class StageCommand {
         COMMAND_USAGE.put("clear_team_player", "/iska_lib_stage clear team_player <target> [silent=false] [hide=false]");
         COMMAND_USAGE.put("clear_all", "/iska_lib_stage clear all [target player] [silent=false] [hide=false]");
 
-        COMMAND_USAGE.put("call_action", "/iska_lib_stage call_action <target> <action_id> [force=false] [silent=false] [hide=false]");
         COMMAND_USAGE.put("reload", "/iska_lib_stage reload");
     }
     
@@ -269,18 +267,6 @@ public class StageCommand {
                                     .then(Commands.argument("silent", BoolArgumentType.bool())
                                         .executes(ctx -> setTeamPlayerStage(ctx, null, null, false))))))
                         ))
-                // CALL_ACTION: run stage action for target(s), stages rechecked at execution
-                .then(Commands.literal("call_action")
-                    .then(Commands.argument("target", EntityArgument.entities()).suggests(StageCommand::suggestOnlinePlayers)
-                        .then(Commands.argument("action_id", StringArgumentType.word()).suggests(StageCommand::suggestActionIds)
-                            .executes(ctx -> callAction(ctx))
-                            .then(Commands.argument("force", BoolArgumentType.bool())
-                                .suggests((c, b) -> SharedSuggestionProvider.suggest(new String[]{"false", "true"}, b))
-                                .executes(ctx -> callAction(ctx))
-                                .then(Commands.argument("silent", BoolArgumentType.bool())
-                                    .executes(ctx -> callAction(ctx))
-                                    .then(Commands.argument("hide", BoolArgumentType.bool())
-                                        .executes(ctx -> callAction(ctx))))))))
                 .then(Commands.literal("reload")
                         .executes(StageCommand::reloadStageBlock))
                 // CLEAR commands
@@ -288,7 +274,7 @@ public class StageCommand {
 
         dispatcher.register(root);
     }
-    
+
     /**
      * Displays command usage to a player
      */
@@ -296,58 +282,12 @@ public class StageCommand {
         String usage = COMMAND_USAGE.getOrDefault(commandKey, "/iska_lib_stage " + commandKey.replace('_', ' '));
         source.sendFailure(Component.literal("§cUsage: " + usage));
     }
-    
+
     /**
      * Gets the command usage string for JSON definitions
      */
     public static String getCommandUsage(String commandKey) {
         return COMMAND_USAGE.getOrDefault(commandKey, "/iska_lib_stage " + commandKey.replace('_', ' '));
-    }
-    
-    /**
-     * call_action command: runs a stage action for target(s). Stages are rechecked at execution.
-     */
-    private static int callAction(CommandContext<CommandSourceStack> context) {
-        CommandSourceStack source = context.getSource();
-        String actionId = StringArgumentType.getString(context, "action_id");
-        boolean force = getOptionalBool(context, "force", false);
-        boolean silent = getOptionalBool(context, "silent", false);
-        boolean hide = getOptionalBool(context, "hide", false);
-
-        List<ServerPlayer> players;
-        try {
-            players = getTargetPlayers(context, "target");
-        } catch (CommandSyntaxException e) {
-            if (!silent) source.sendFailure(Component.literal("§cInvalid target: " + e.getMessage()));
-            return 0;
-        }
-
-        if (players.isEmpty()) {
-            if (!silent) source.sendFailure(Component.literal("§cNo valid players found"));
-            return 0;
-        }
-
-        int executed = StageActionHooks.getListener().executeActionById(actionId, players, force);
-        if (executed == -1) {
-            if (!silent) source.sendFailure(Component.literal("§cUnknown action id: " + actionId));
-            return 0;
-        }
-        if (executed == 0 && !force) {
-            if (!silent) source.sendFailure(Component.literal("§cAction '" + actionId + "' has onCall=false. Use force=true to bypass."));
-            return 0;
-        }
-        if (!silent && !hide) {
-            source.sendSuccess(() -> Component.literal("§aExecuted action §e" + actionId + " §afor §f" + executed + " §aplayer(s)"), false);
-        }
-        return executed;
-    }
-
-    private static boolean getOptionalBool(CommandContext<CommandSourceStack> context, String name, boolean defaultValue) {
-        try {
-            return context.getArgument(name, Boolean.class);
-        } catch (IllegalArgumentException e) {
-            return defaultValue;
-        }
     }
 
     /**
@@ -462,14 +402,6 @@ public class StageCommand {
             }
         }
         return found;
-    }
-
-    /**
-     * Suggestion provider for stage action ids (autocomplete).
-     */
-    private static CompletableFuture<Suggestions> suggestActionIds(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
-        List<String> ids = StageActionHooks.getListener().listActionIds();
-        return SharedSuggestionProvider.suggest(ids, builder);
     }
 
     /**
