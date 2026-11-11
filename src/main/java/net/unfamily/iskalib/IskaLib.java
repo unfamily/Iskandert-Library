@@ -49,6 +49,7 @@ public class IskaLib {
                 LOGGER.error("Failed to initialize FTB Ultimine integration", error);
             }
         }
+        net.unfamily.iskalib.flux.IskaLibParticles.register(modEventBus);
         IskaLibGases.initLibrary(modEventBus);
         IskaLibLiquids.initLibrary(modEventBus);
         LiquidJsonLoader.bootstrapAndRegister(true);

@@ -10,6 +10,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.core.HolderLookup;
 import net.unfamily.iskalib.IskaLibConfig;
 import net.unfamily.iskalib.integration.ftbteams.FtbTeamsBridge;
+import net.unfamily.iskalib.stage.StageRegistry;
 import org.slf4j.Logger;
 
 import java.util.*;
@@ -129,10 +130,26 @@ public class ShopTeamManager {
 
     public void ensureShopTeamForFtb(String teamKey, String displayName, UUID ownerId) {
         getTeamData().ensureTeamForFtb(teamKey, displayName, ownerId);
+        migrateTeamStageStorageKeys(teamKey, displayName, ownerId);
     }
 
     public void applyFtbTeamSnapshot(String teamKey, String displayName, UUID ownerId, Set<UUID> members, Set<UUID> assistants) {
         getTeamData().applyFtbTeamSnapshot(teamKey, displayName, ownerId, members, assistants);
+        migrateTeamStageStorageKeys(teamKey, displayName, ownerId);
+    }
+
+    /** Aligns Library {@code TeamStageData} keys with the shop/FTB team key. */
+    private void migrateTeamStageStorageKeys(String teamKey, String displayName, UUID ownerId) {
+        if (teamKey == null || teamKey.isBlank() || level.getServer() == null) {
+            return;
+        }
+        StageRegistry registry = StageRegistry.getInstance(level.getServer());
+        if (ownerId != null) {
+            registry.migrateTeamStageKey(ownerId.toString(), teamKey);
+        }
+        if (displayName != null && !displayName.isBlank() && !displayName.equals(teamKey)) {
+            registry.migrateTeamStageKey(displayName, teamKey);
+        }
     }
 
     public String getTeamDisplayName(String teamKey) {
@@ -188,7 +205,10 @@ public class ShopTeamManager {
         UUID leader = data.getTeamLeader(teamName);
         if (leader != null && leader.equals(new UUID(0L, 0L)) && IskaLibConfig.FTB_TEAMS_SYNC_ENABLED.get() && FtbTeamsBridge.isAvailable()) {
             // Attempt live refresh from FTB to fix temporary NIL owner saved in shop data
-            FtbTeamsBridge.getTeamInfoByTeamKey(teamName).ifPresent(info -> data.ensureTeamForFtb(info.teamKey(), info.displayName(), info.ownerId()));
+            FtbTeamsBridge.getTeamInfoByTeamKey(teamName).ifPresent(info -> {
+                data.ensureTeamForFtb(info.teamKey(), info.displayName(), info.ownerId());
+                migrateTeamStageStorageKeys(info.teamKey(), info.displayName(), info.ownerId());
+            });
             leader = data.getTeamLeader(teamName);
         }
         return leader;

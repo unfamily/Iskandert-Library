@@ -7,6 +7,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.mojang.logging.LogUtils;
@@ -25,9 +26,12 @@ import net.unfamily.iskalib.stage.StageReloadHooks;
 import net.unfamily.iskalib.team.ShopTeamManager;
 import org.slf4j.Logger;
 
+import net.minecraft.server.level.ServerLevel;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -77,8 +81,10 @@ public class StageCommand {
         COMMAND_USAGE.put("clear_team_player", "/iska_lib_stage clear team_player <target> [silent=false] [hide=false]");
         COMMAND_USAGE.put("clear_all", "/iska_lib_stage clear all [target player] [silent=false] [hide=false] — player, world, and team stages for the player(s)");
 
-        COMMAND_USAGE.put("call_action", "/iska_lib_stage call_action <target> <action_id> [force=false] [silent=false] [hide=false]");
+        COMMAND_USAGE.put("call_action",
+                "/iska_lib_stage call_action <target> <action_id> [force=false] [silent=false] [hide=false] — §cJSON ONLY§r (stage_actions datapack)");
         COMMAND_USAGE.put("reload", "/iska_lib_stage reload");
+        COMMAND_USAGE.put("edit", "/iska_lib_stage edit — Stage Generator GUI (Another Stages)");
     }
     
     /**
@@ -140,7 +146,7 @@ public class StageCommand {
         LiteralArgumentBuilder<CommandSourceStack> addNode = Commands.literal("add")
             .then(Commands.literal("player")
                 .then(Commands.argument("target", EntityArgument.entities()).suggests(StageCommand::suggestOnlinePlayers)
-                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("player"))
                         .executes(ctx -> setPlayerStage(ctx, true, false, false))
                         .then(Commands.argument("silent", BoolArgumentType.bool())
                             .executes(ctx -> setPlayerStage(ctx, true, null, false))
@@ -148,7 +154,7 @@ public class StageCommand {
                                 .executes(ctx -> setPlayerStage(ctx, true, null, ctx.getArgument("hide", Boolean.class)))))))
                 )
             .then(Commands.literal("world")
-                .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("world"))
                     .executes(ctx -> setWorldStage(ctx, true, false, false))
                     .then(Commands.argument("silent", BoolArgumentType.bool())
                         .executes(ctx -> setWorldStage(ctx, true, null, false))
@@ -156,7 +162,7 @@ public class StageCommand {
                             .executes(ctx -> setWorldStage(ctx, true, null, ctx.getArgument("hide", Boolean.class)))))))
             .then(Commands.literal("team")
                 .then(Commands.argument("team_name", StringArgumentType.string()).suggests(StageCommand::suggestTeamNames)
-                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("team"))
                         .executes(ctx -> setTeamStage(ctx, true, false, false))
                         .then(Commands.argument("silent", BoolArgumentType.bool())
                             .executes(ctx -> setTeamStage(ctx, true, null, false))
@@ -164,7 +170,7 @@ public class StageCommand {
                                 .executes(ctx -> setTeamStage(ctx, true, null, ctx.getArgument("hide", Boolean.class))))))))
             .then(Commands.literal("team_player")
                 .then(Commands.argument("target", EntityArgument.entities()).suggests(StageCommand::suggestOnlinePlayers)
-                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("team_player"))
                         .executes(ctx -> setTeamPlayerStage(ctx, true, false, false))
                         .then(Commands.argument("silent", BoolArgumentType.bool())
                             .executes(ctx -> setTeamPlayerStage(ctx, true, null, false))
@@ -176,7 +182,7 @@ public class StageCommand {
         LiteralArgumentBuilder<CommandSourceStack> removeNode = Commands.literal("remove")
             .then(Commands.literal("player")
                 .then(Commands.argument("target", EntityArgument.entities()).suggests(StageCommand::suggestOnlinePlayers)
-                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("player"))
                         .executes(ctx -> setPlayerStage(ctx, false, false, false))
                         .then(Commands.argument("silent", BoolArgumentType.bool())
                             .executes(ctx -> setPlayerStage(ctx, false, null, false))
@@ -184,7 +190,7 @@ public class StageCommand {
                                 .executes(ctx -> setPlayerStage(ctx, false, null, ctx.getArgument("hide", Boolean.class)))))))
                 )
             .then(Commands.literal("world")
-                .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("world"))
                     .executes(ctx -> setWorldStage(ctx, false, false, false))
                     .then(Commands.argument("silent", BoolArgumentType.bool())
                         .executes(ctx -> setWorldStage(ctx, false, null, false))
@@ -192,7 +198,7 @@ public class StageCommand {
                             .executes(ctx -> setWorldStage(ctx, false, null, ctx.getArgument("hide", Boolean.class)))))))
             .then(Commands.literal("team")
                 .then(Commands.argument("team_name", StringArgumentType.string()).suggests(StageCommand::suggestTeamNames)
-                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("team"))
                         .executes(ctx -> setTeamStage(ctx, false, false, false))
                         .then(Commands.argument("silent", BoolArgumentType.bool())
                             .executes(ctx -> setTeamStage(ctx, false, null, false))
@@ -200,7 +206,7 @@ public class StageCommand {
                                 .executes(ctx -> setTeamStage(ctx, false, null, ctx.getArgument("hide", Boolean.class))))))))
             .then(Commands.literal("team_player")
                 .then(Commands.argument("target", EntityArgument.entities()).suggests(StageCommand::suggestOnlinePlayers)
-                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                    .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("team_player"))
                         .executes(ctx -> setTeamPlayerStage(ctx, false, false, false))
                         .then(Commands.argument("silent", BoolArgumentType.bool())
                             .executes(ctx -> setTeamPlayerStage(ctx, false, null, false))
@@ -237,7 +243,7 @@ public class StageCommand {
                 .then(Commands.literal("set")
                     .then(Commands.literal("player")
                         .then(Commands.argument("target", EntityArgument.entities()).suggests(StageCommand::suggestOnlinePlayers)
-                            .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                            .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("player"))
                                 .executes(ctx -> setPlayerStage(ctx, true, false, false))
                                 .then(Commands.argument("value", BoolArgumentType.bool())
                                     .executes(ctx -> setPlayerStage(ctx, null, false, false))
@@ -245,7 +251,7 @@ public class StageCommand {
                                         .executes(ctx -> setPlayerStage(ctx, null, null, false))))))
                         )
                     .then(Commands.literal("world")
-                        .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                        .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("world"))
                             .executes(ctx -> setWorldStage(ctx, true, false, false))
                             .then(Commands.argument("value", BoolArgumentType.bool())
                                 .executes(ctx -> setWorldStage(ctx, null, false, false))
@@ -253,7 +259,7 @@ public class StageCommand {
                                     .executes(ctx -> setWorldStage(ctx, null, null, false))))))
                     .then(Commands.literal("team")
                         .then(Commands.argument("team_name", StringArgumentType.string()).suggests(StageCommand::suggestTeamNames)
-                            .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                            .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("team"))
                                 .executes(ctx -> setTeamStage(ctx, true, false, false))
                                 .then(Commands.argument("value", BoolArgumentType.bool())
                                     .executes(ctx -> setTeamStage(ctx, null, false, false))
@@ -261,15 +267,16 @@ public class StageCommand {
                                         .executes(ctx -> setTeamStage(ctx, null, null, false)))))))
                     .then(Commands.literal("team_player")
                         .then(Commands.argument("target", EntityArgument.entities()).suggests(StageCommand::suggestOnlinePlayers)
-                            .then(Commands.argument("stage", StringArgumentType.string()).suggests(StageCommand::suggestStages)
+                            .then(Commands.argument("stage", StringArgumentType.string()).suggests(suggestStagesFor("team_player"))
                                 .executes(ctx -> setTeamPlayerStage(ctx, true, false, false))
                                 .then(Commands.argument("value", BoolArgumentType.bool())
                                     .executes(ctx -> setTeamPlayerStage(ctx, null, false, false))
                                     .then(Commands.argument("silent", BoolArgumentType.bool())
                                         .executes(ctx -> setTeamPlayerStage(ctx, null, null, false))))))
                         ))
-                // CALL_ACTION: run stage action for target(s), stages rechecked at execution
-                .then(Commands.literal("call_action")
+                // CALL_ACTION: word-arg (not literal) so Tab shows JSON-only tooltip in command GUI
+                .then(Commands.argument("call_action", StringArgumentType.word())
+                    .suggests(StageCommand::suggestCallActionVerb)
                     .then(Commands.argument("target", EntityArgument.entities()).suggests(StageCommand::suggestOnlinePlayers)
                         .then(Commands.argument("action_id", StringArgumentType.word()).suggests(StageCommand::suggestActionIds)
                             .executes(ctx -> callAction(ctx))
@@ -285,7 +292,30 @@ public class StageCommand {
                 // CLEAR commands
                 .then(clearNode);
 
+        // Stage Generator GUI: only when Another Stages registered StageEditHooks.
+        if (StageEditHooks.getListener() != null) {
+            root.then(Commands.literal("edit").executes(StageCommand::openStageEdit));
+        }
+
         dispatcher.register(root);
+    }
+
+    /**
+     * Opens the Another Stages Stage Generator (client screen via AS packet).
+     */
+    private static int openStageEdit(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayer();
+        if (player == null) {
+            throw ERROR_NEED_PLAYER.create();
+        }
+        StageEditHooks.Listener listener = StageEditHooks.getListener();
+        if (listener == null) {
+            context.getSource().sendFailure(Component.translatable(
+                    "commands.iska_lib.stage.edit.unavailable"));
+            return 0;
+        }
+        listener.openEditor(player);
+        return 1;
     }
     
     /**
@@ -303,11 +333,25 @@ public class StageCommand {
         return COMMAND_USAGE.getOrDefault(commandKey, "/iska_lib_stage " + commandKey.replace('_', ' '));
     }
     
+    private static final Component CALL_ACTION_JSON_ONLY_TIP =
+            Component.literal("§cJSON ONLY§r / §cSOLO JSON§r — datapack stage_actions");
+
+    private static CompletableFuture<Suggestions> suggestCallActionVerb(
+            CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
+        builder.suggest("call_action", CALL_ACTION_JSON_ONLY_TIP);
+        return builder.buildFuture();
+    }
+
     /**
-     * call_action command: runs a stage action for target(s). Stages are rechecked at execution.
+     * call_action: runs datapack Stage Actions only. §cJSON ONLY§r — not Kube stageChanged.
      */
     private static int callAction(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        String verb = StringArgumentType.getString(context, "call_action");
+        if (!"call_action".equals(verb)) {
+            sendUsage(source, "call_action");
+            return 0;
+        }
         String actionId = StringArgumentType.getString(context, "action_id");
         boolean force = getOptionalBool(context, "force", false);
         boolean silent = getOptionalBool(context, "silent", false);
@@ -328,15 +372,24 @@ public class StageCommand {
 
         int executed = StageActionHooks.getListener().executeActionById(actionId, players, force);
         if (executed == -1) {
-            if (!silent) source.sendFailure(Component.literal("§cUnknown action id: " + actionId));
+            if (!silent) {
+                source.sendFailure(Component.literal(
+                        "§cUnknown action id: " + actionId + " §7(§cJSON ONLY§7 — datapack stage_actions)"));
+            }
             return 0;
         }
         if (executed == 0 && !force) {
-            if (!silent) source.sendFailure(Component.literal("§cAction '" + actionId + "' has onCall=false. Use force=true to bypass."));
+            if (!silent) {
+                source.sendFailure(Component.literal(
+                        "§cAction '" + actionId + "' has onCall=false. Use force=true to bypass. §7(§cJSON ONLY§7)"));
+            }
             return 0;
         }
         if (!silent && !hide) {
-            source.sendSuccess(() -> Component.literal("§aExecuted action §e" + actionId + " §afor §f" + executed + " §aplayer(s)"), false);
+            source.sendSuccess(
+                    () -> Component.literal(
+                            "§aExecuted §cJSON ONLY§a action §e" + actionId + " §afor §f" + executed + " §aplayer(s)"),
+                    false);
         }
         return executed;
     }
@@ -382,14 +435,30 @@ public class StageCommand {
     }
 
     /**
+     * Binds stage suggestions to a command branch. Prefer this over resolving the type from
+     * {@link CommandContext#getNodes()} — suggestion contexts can omit parent literals.
+     */
+    private static SuggestionProvider<CommandSourceStack> suggestStagesFor(String stageType) {
+        return (context, builder) -> suggestStages(context, builder, stageType);
+    }
+
+    /**
      * Suggestion provider for stage names (autocomplete), filtered by command type
      * (player / world / team / team_player) so suggestions match the branch in use.
+     * Includes stages already assigned on that branch plus StageCatalog ids for that type
+     * (AS datapack/Kube restrictions, Library stage actions, …).
      */
-    private static CompletableFuture<Suggestions> suggestStages(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
+    private static CompletableFuture<Suggestions> suggestStages(
+            CommandContext<CommandSourceStack> context,
+            SuggestionsBuilder builder,
+            String stageType) {
         try {
             var server = context.getSource().getServer();
             StageRegistry registry = StageRegistry.getInstance(server);
-            String type = resolveStageCommandType(context);
+            String type = stageType;
+            if (type == null || type.isBlank()) {
+                type = resolveStageCommandType(context);
+            }
             java.util.LinkedHashSet<String> stages = new java.util.LinkedHashSet<>();
             switch (type != null ? type : "") {
                 case "world" -> stages.addAll(registry.getWorldStages());
@@ -427,9 +496,13 @@ public class StageCommand {
                         }
                     }
                 }
-                default -> stages.addAll(registry.getAllRegisteredStages());
+                default -> {
+                    // Unknown branch: do not dump the global catalog.
+                }
             }
-            stages.addAll(StageCatalog.getKnownStages());
+            if (type != null && !type.isEmpty()) {
+                stages.addAll(StageCatalog.getKnownStages(type));
+            }
             return SharedSuggestionProvider.suggest(new ArrayList<>(stages), builder);
         } catch (Exception e) {
             return Suggestions.empty();
@@ -464,25 +537,34 @@ public class StageCommand {
     }
 
     /**
-     * Suggestion provider for stage action ids (autocomplete).
+     * Suggestion provider for stage action ids (autocomplete) with JSON-only tooltip.
      */
     private static CompletableFuture<Suggestions> suggestActionIds(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
         List<String> ids = StageActionHooks.getListener().listActionIds();
-        return SharedSuggestionProvider.suggest(ids, builder);
+        return SharedSuggestionProvider.suggest(ids, builder, id -> id, id -> CALL_ACTION_JSON_ONLY_TIP);
     }
 
     /**
      * Suggestion provider for team names (autocomplete).
+     * Prefers ShopTeamManager display names and keys; also includes keys already in TeamStageData.
      */
     private static CompletableFuture<Suggestions> suggestTeamNames(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
         try {
             var server = context.getSource().getServer();
-            var level = server.getLevel(Level.OVERWORLD);
-            if (level == null) return Suggestions.empty();
+            ServerLevel level = server.getLevel(Level.OVERWORLD);
+            if (level == null) {
+                return Suggestions.empty();
+            }
+            LinkedHashSet<String> suggestions = new LinkedHashSet<>();
+            ShopTeamManager teams = ShopTeamManager.getInstance(level);
+            suggestions.addAll(teams.getAllTeamNames());
+            suggestions.addAll(teams.getAllTeams());
             StageRegistry registry = StageRegistry.getInstance(server);
             var teamData = registry.getTeamStageData(level);
-            if (teamData == null) return Suggestions.empty();
-            return SharedSuggestionProvider.suggest(new ArrayList<>(teamData.getAllTeams()), builder);
+            if (teamData != null) {
+                suggestions.addAll(teamData.getAllTeams());
+            }
+            return SharedSuggestionProvider.suggest(new ArrayList<>(suggestions), builder);
         } catch (Exception e) {
             return Suggestions.empty();
         }
@@ -657,16 +739,16 @@ public class StageCommand {
         try {
             CommandSourceStack source = context.getSource();
             StageRegistry registry = StageRegistry.getInstance(source.getServer());
-            
-            // Get the team name
-            String teamName = StringArgumentType.getString(context, "team_name");
-            
-            source.sendSuccess(() -> Component.literal("§6===== Team Stages for " + teamName + " ====="), false);
-            
-            List<String> teamStages = registry.getTeamStages(teamName);
+            String input = StringArgumentType.getString(context, "team_name");
+            String teamKey = registry.resolveTeamKey(input);
+            String label = teamKey.equals(input) ? input : input + " §7(key " + teamKey + ")";
+
+            source.sendSuccess(() -> Component.literal("§6===== Team Stages for " + label + " ====="), false);
+
+            List<String> teamStages = registry.getTeamStages(teamKey);
             String teamStagesText = teamStages.isEmpty() ? "§7(none)" : "§b" + String.join(", ", teamStages);
             source.sendSuccess(() -> Component.literal("§bTeam Stages: " + teamStagesText), false);
-            
+
             return 1;
         } catch (Exception e) {
             LOGGER.error("Error in listTeamStages command", e);
@@ -1033,25 +1115,28 @@ public class StageCommand {
         try {
             CommandSourceStack source = context.getSource();
             StageRegistry registry = StageRegistry.getInstance(source.getServer());
-            String teamName = StringArgumentType.getString(context, "team_name");
+            String input = StringArgumentType.getString(context, "team_name");
+            String teamKey = registry.resolveTeamKey(input);
             String stage = StringArgumentType.getString(context, "stage");
             boolean value = valueOverride != null ? valueOverride : BoolArgumentType.getBool(context, "value");
             boolean silent = silentOverride != null ? silentOverride : context.getArgument("silent", Boolean.class);
             boolean broadcastToOps = !hideInLog;
             // B3: pre-check stage presence for remove operations
-            if (!value && !registry.getTeamStages(teamName).contains(stage)) {
-                if (!silent) source.sendFailure(Component.literal("§cStage §e" + stage + "§c is not set for team §b" + teamName));
+            if (!value && !registry.getTeamStages(teamKey).contains(stage)) {
+                if (!silent) {
+                    source.sendFailure(Component.literal("§cStage §e" + stage + "§c is not set for team §b" + input));
+                }
                 return 0;
             }
-            boolean success = registry.setTeamStage(teamName, stage, value);
+            boolean success = registry.setTeamStage(teamKey, stage, value);
             if (success && !silent) {
+                String shown = teamKey.equals(input) ? input : input + " §7(" + teamKey + ")";
                 Component message = value
-                    ? Component.literal("Added stage §a" + stage + "§r to team §b" + teamName)
-                    : Component.literal("Removed stage §c" + stage + "§r from team §b" + teamName);
+                    ? Component.literal("Added stage §a" + stage + "§r to team §b" + shown)
+                    : Component.literal("Removed stage §c" + stage + "§r from team §b" + shown);
                 source.sendSuccess(() -> message, broadcastToOps);
             } else if (!success && !silent) {
-                // B3: team missing or data error
-                source.sendFailure(Component.literal("§cTeam §b" + teamName + "§c not found or data error"));
+                source.sendFailure(Component.literal("§cTeam §b" + input + "§c not found or data error"));
             }
             return success ? 1 : 0;
         } catch (Exception e) {
@@ -1161,16 +1246,18 @@ public class StageCommand {
         try {
             CommandSourceStack source = context.getSource();
             StageRegistry registry = StageRegistry.getInstance(source.getServer());
-            String teamName = StringArgumentType.getString(context, "team_name");
-            List<String> teamStages = registry.getTeamStages(teamName);
+            String input = StringArgumentType.getString(context, "team_name");
+            String teamKey = registry.resolveTeamKey(input);
+            List<String> teamStages = registry.getTeamStages(teamKey);
             int stageCount = teamStages.size();
             for (String stage : teamStages) {
-                registry.setTeamStage(teamName, stage, false);
+                registry.setTeamStage(teamKey, stage, false);
             }
             boolean silent = silentOverride != null ? silentOverride : false;
             boolean broadcastToOps = !hideInLog;
             if (!silent) {
-                String feedback = "§aCleared " + stageCount + " team stages for " + teamName;
+                String shown = teamKey.equals(input) ? input : input + " §7(" + teamKey + ")";
+                String feedback = "§aCleared " + stageCount + " team stages for " + shown;
                 source.sendSuccess(() -> Component.literal(feedback), broadcastToOps);
             }
             return stageCount;

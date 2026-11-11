@@ -47,12 +47,16 @@ public final class StageItemEvents {
         }
     }
     
+    private static boolean anotherStagesOwnsItems() {
+        return net.neoforged.fml.ModList.get().isLoaded("another_stages");
+    }
+
     /**
      * Handles container open events
      */
     @SubscribeEvent
     public static void onContainerOpen(PlayerContainerEvent.Open event) {
-        if (!initialized) {
+        if (!initialized || anotherStagesOwnsItems()) {
             return;
         }
         
