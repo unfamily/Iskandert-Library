@@ -96,7 +96,41 @@ public class StageRegistry {
 
     public boolean hasTeamStage(String teamName, String stage) {
         TeamStageData data = getTeamStageData(server.getLevel(Level.OVERWORLD));
-        return data != null && data.hasTeamStage(teamName, stage);
+        return data != null && data.hasTeamStage(resolveTeamKey(teamName), stage);
+    }
+
+    /**
+     * Resolves a packdev-facing team name (display or internal key) to the ShopTeamManager key
+     * used in {@link TeamStageData} (UUID string when FTB Teams sync is on).
+     */
+    public String resolveTeamKey(@Nullable String teamNameOrDisplay) {
+        if (teamNameOrDisplay == null || teamNameOrDisplay.isEmpty()) {
+            return teamNameOrDisplay;
+        }
+        ServerLevel overworld = server.getLevel(Level.OVERWORLD);
+        if (overworld == null) {
+            return teamNameOrDisplay;
+        }
+        return ShopTeamManager.getInstance(overworld).resolveTeamKeyByDisplayName(teamNameOrDisplay);
+    }
+
+    /**
+     * Moves team stages from one storage key to another (e.g. legacy owner UUID / display name
+     * → FTB team UUID). Merges into the destination if both keys have stages.
+     */
+    public boolean migrateTeamStageKey(@Nullable String fromKey, @Nullable String toKey) {
+        if (fromKey == null || toKey == null || fromKey.isEmpty() || toKey.isEmpty() || fromKey.equals(toKey)) {
+            return false;
+        }
+        TeamStageData data = getTeamStageData(server.getLevel(Level.OVERWORLD));
+        if (data == null) {
+            return false;
+        }
+        boolean moved = data.migrateTeamKey(fromKey, toKey);
+        if (moved) {
+            LOGGER.info("Migrated team stages from key '{}' to '{}'", fromKey, toKey);
+        }
+        return moved;
     }
 
     public boolean hasPlayerTeamStage(ServerPlayer player, String stage) {
@@ -291,22 +325,23 @@ public class StageRegistry {
             return false;
         }
 
-        boolean already = data.hasTeamStage(teamName, stage);
+        String teamKey = resolveTeamKey(teamName);
+        boolean already = data.hasTeamStage(teamKey, stage);
         if (value == already) {
             return true;
         }
 
         if (value) {
-            data.addTeamStage(teamName, stage);
+            data.addTeamStage(teamKey, stage);
         } else {
-            data.removeTeamStage(teamName, stage);
+            data.removeTeamStage(teamKey, stage);
         }
 
         data.setDirty();
-        StageHooks.getListener().onTeamStageChanged(server, teamName, stage, value);
+        StageHooks.getListener().onTeamStageChanged(server, teamKey, stage, value);
 
         if (!hideLog) {
-            LOGGER.info("Set team stage '{}' to {} for team '{}'", stage, value, teamName);
+            LOGGER.info("Set team stage '{}' to {} for team '{}' (key '{}')", stage, value, teamName, teamKey);
         }
         return true;
     }
@@ -342,7 +377,7 @@ public class StageRegistry {
         if (data == null) {
             return Collections.emptyList();
         }
-        return data.getTeamStages(teamName);
+        return data.getTeamStages(resolveTeamKey(teamName));
     }
 
     public List<String> getPlayerTeamStages(ServerPlayer player) {
@@ -689,6 +724,21 @@ public class StageRegistry {
 
         public Set<String> getAllTeams() {
             return new HashSet<>(teamStages.keySet());
+        }
+
+        /**
+         * Moves stages from {@code fromKey} into {@code toKey}, merging if needed.
+         *
+         * @return true if any stages were moved
+         */
+        public boolean migrateTeamKey(String fromKey, String toKey) {
+            Set<String> from = teamStages.remove(fromKey);
+            if (from == null || from.isEmpty()) {
+                return false;
+            }
+            teamStages.computeIfAbsent(toKey, k -> new HashSet<>()).addAll(from);
+            setDirty();
+            return true;
         }
     }
 }

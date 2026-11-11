@@ -15,7 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Ensures stage datapack JSON (actions + AS item/recipe/block/gui via {@link StageReloadHooks})
+ * Ensures stage datapack JSON (actions, known_stages + AS item/recipe/block/gui via {@link StageReloadHooks})
  * loads at world start and on {@code /reload}, not only on manual stage reload commands.
  */
 @EventBusSubscriber(modid = IskaLib.MOD_ID)

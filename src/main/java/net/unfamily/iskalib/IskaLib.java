@@ -31,6 +31,7 @@ public class IskaLib {
 
     public IskaLib(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.COMMON, IskaLibConfig.SPEC);
+        net.unfamily.iskalib.flux.IskaLibParticles.register(modEventBus);
         IskaLibGases.initLibrary(modEventBus);
         IskaLibLiquids.initLibrary(modEventBus);
         net.unfamily.iskalib.client.IskaLibConsumerClientHooks.hookConsumerModClientOnce(modEventBus);

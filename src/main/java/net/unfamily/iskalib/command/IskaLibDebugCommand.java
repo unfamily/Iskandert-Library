@@ -67,13 +67,7 @@ public final class IskaLibDebugCommand {
             context.getSource().sendFailure(Component.translatable("commands.iska_lib.stage.reload.unavailable"));
             return 0;
         }
-        int result = listener.reloadStageBlock(context.getSource());
-        if (result > 0) {
-            context.getSource().sendSuccess(
-                    () -> Component.translatable("commands.iska_lib.stage.reload.success"),
-                    true);
-        }
-        return result;
+        return listener.reloadStageBlock(context.getSource());
     }
 
     private static int executeWiki(CommandContext<CommandSourceStack> context) {

@@ -19,7 +19,6 @@
   "commands.iska_lib.explosion.info.active_front": "  Front at %s %s %s (sub-region %s%%)",
   "commands.iska_lib.debug.reload.unavailable": "No datapack reload consumer registered (install Iska Utils).",
   "commands.iska_lib.stage.reload.unavailable": "No stage reload consumer registered (install Iska Utils).",
-  "commands.iska_lib.stage.reload.success": "Stage block reloaded (actions, items, catalog).",
   "commands.iska_lib.debug.wiki": "Developers wiki: %s",
   "commands.iska_lib.debug.wiki.hover": "Open the Iskandert Utilities wiki",
   "commands.iska_lib.team.currency.empty": "The currency catalog is empty.",
@@ -64,5 +63,6 @@
   "ftbquests.reward.iska_lib.iska_currency.currency": "Currency",
   "ftbquests.reward.iska_lib.iska_currency.amount": "Amount",
   "ftbquests.reward.iska_lib.iska_currency.notify": "Updated team balance by %s %s.",
-  "ftbquests.reward.iska_lib.iska_currency.failed": "Could not update team balance by %s %s."
+  "ftbquests.reward.iska_lib.iska_currency.failed": "Could not update team balance by %s %s.",
+  "commands.iska_lib.stage.edit.unavailable": "Stage Generator is unavailable (install Another Stages)."
 }

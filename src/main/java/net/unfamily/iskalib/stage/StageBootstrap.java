@@ -6,6 +6,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +29,17 @@ public final class StageBootstrap {
             return;
         }
         installed = true;
-        StageCatalog.addContributor(StageBootstrap::collectKnownStages);
+        StageCatalog.addContributor(new StageCatalog.Contributor() {
+            @Override
+            public Collection<String> knownStages() {
+                return collectKnownStages();
+            }
+
+            @Override
+            public Collection<String> knownStagesForType(String stageType) {
+                return collectKnownStages(stageType);
+            }
+        });
         StageReloadHooks.setListener(StageBootstrap::reloadStageBlock);
         StageActionHooks.setListener(new StageActionHooks.Listener() {
             @Override
@@ -58,6 +69,7 @@ public final class StageBootstrap {
             }
         });
         StageActionsLoader.scanConfigDirectory();
+        KnownStagesLoader.loadAll(null);
         // Another Stages owns item gating when present (avoids double-filter).
         if (!isAnotherStagesLoaded()) {
             StageItemEvents.initialize();
@@ -70,15 +82,32 @@ public final class StageBootstrap {
     }
 
     private static Collection<String> collectKnownStages() {
+        return collectKnownStages(null);
+    }
+
+    private static Collection<String> collectKnownStages(@Nullable String stageType) {
+        String want = stageType == null || stageType.isBlank()
+                ? null
+                : stageType.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("team_player".equals(want)) {
+            want = "team";
+        }
         Set<String> stages = new LinkedHashSet<>();
         for (StageActionDefinition def : StageActionsLoader.getLoadedActions()) {
             for (StageActionDefinition.StageCondition condition : def.getStages()) {
-                if (condition != null && condition.stage != null && !condition.stage.isBlank()) {
-                    stages.add(condition.stage.trim());
+                if (condition == null || condition.stage == null || condition.stage.isBlank()) {
+                    continue;
                 }
+                String type = condition.stageType == null || condition.stageType.isBlank()
+                        ? "player"
+                        : condition.stageType.trim().toLowerCase(java.util.Locale.ROOT);
+                if (want != null && !want.equals(type)) {
+                    continue;
+                }
+                stages.add(condition.stage.trim());
             }
         }
-        if (!isAnotherStagesLoaded()) {
+        if (!isAnotherStagesLoaded() && want == null) {
             stages.addAll(StageItemHandler.collectReferencedStages());
         }
         return stages;
@@ -86,13 +115,19 @@ public final class StageBootstrap {
 
     private static int reloadStageBlock(CommandSourceStack source) {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-        ResourceManager rm = server != null ? server.getResourceManager() : null;
+        // Prefer the ResourceManager from datapack /reload apply (ThreadLocal); server RM can be stale mid-reload.
+        ResourceManager pending = StageReloadHooks.currentResourceManagerOrNull();
+        ResourceManager rm = pending != null
+                ? pending
+                : (server != null ? server.getResourceManager() : null);
         StageActionsLoader.loadAll(rm);
+        KnownStagesLoader.loadAll(rm);
         if (!isAnotherStagesLoaded()) {
             StageItemHandler.loadAll(rm);
-            LOGGER.info("Reloaded stage actions ({}) and stage items", StageActionsLoader.getActionIds().size());
+            LOGGER.info("Reloaded stage actions ({}), known stages, and stage items",
+                    StageActionsLoader.getActionIds().size());
         } else {
-            LOGGER.info("Reloaded stage actions ({}); item restrictions owned by Another Stages",
+            LOGGER.info("Reloaded stage actions ({}) and known stages; item restrictions owned by Another Stages",
                     StageActionsLoader.getActionIds().size());
         }
         return 1;

@@ -12,6 +12,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import net.unfamily.iskalib.IskaLibConfig;
 import net.unfamily.iskalib.integration.ftbteams.FtbTeamsBridge;
+import net.unfamily.iskalib.stage.StageRegistry;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -132,6 +133,7 @@ public class ShopTeamManager {
     public void ensureShopTeamForFtb(String teamKey, String displayName, UUID ownerId) {
         TeamData data = getTeamData();
         data.ensureTeamForExternalKey(teamKey, displayName, ownerId);
+        migrateTeamStageStorageKeys(teamKey, displayName, ownerId);
     }
 
     /**
@@ -141,6 +143,21 @@ public class ShopTeamManager {
     public void applyExternalTeamSnapshot(String teamKey, String displayName, UUID ownerId, Set<UUID> members, Set<UUID> assistants) {
         TeamData data = getTeamData();
         data.applyExternalSnapshot(teamKey, displayName, ownerId, members, assistants);
+        migrateTeamStageStorageKeys(teamKey, displayName, ownerId);
+    }
+
+    /** Aligns Library {@code TeamStageData} keys with the shop/FTB team key. */
+    private void migrateTeamStageStorageKeys(String teamKey, String displayName, UUID ownerId) {
+        if (teamKey == null || teamKey.isBlank() || level.getServer() == null) {
+            return;
+        }
+        StageRegistry registry = StageRegistry.getInstance(level.getServer());
+        if (ownerId != null) {
+            registry.migrateTeamStageKey(ownerId.toString(), teamKey);
+        }
+        if (displayName != null && !displayName.isBlank() && !displayName.equals(teamKey)) {
+            registry.migrateTeamStageKey(displayName, teamKey);
+        }
     }
 
     public List<UUID> getTeamMembers(String teamName) {
@@ -155,8 +172,10 @@ public class ShopTeamManager {
                 && Util.NIL_UUID.equals(leader)
                 && IskaLibConfig.FTB_TEAMS_SYNC_ENABLED.get()
                 && FtbTeamsBridge.isAvailable()) {
-            FtbTeamsBridge.getSnapshotByTeamKey(teamName).ifPresent(snap ->
-                    data.ensureTeamForExternalKey(snap.teamKey(), snap.displayName(), snap.ownerId()));
+            FtbTeamsBridge.getSnapshotByTeamKey(teamName).ifPresent(snap -> {
+                data.ensureTeamForExternalKey(snap.teamKey(), snap.displayName(), snap.ownerId());
+                migrateTeamStageStorageKeys(snap.teamKey(), snap.displayName(), snap.ownerId());
+            });
             leader = data.getTeamLeader(teamName);
         }
         return leader;

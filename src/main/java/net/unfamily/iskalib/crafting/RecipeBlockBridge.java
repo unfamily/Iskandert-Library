@@ -15,21 +15,21 @@ import org.jetbrains.annotations.Nullable;
  * Mods register {@link Provider}s; machines call {@link #isRecipeBlocked} when selecting a recipe.
  * Default with no providers: not blocked. Retrocompatible — does not alter recipe loading.
  * <p>
- * With providers registered: missing owner ({@code ownerUuid == null}) is blocked by the bridge
- * without consulting providers. With a present UUID (online or offline), providers decide via
+ * With providers registered, every call consults providers — including when
+ * {@code ownerUuid == null} (no-owner machines; providers decide world vs player fail-closed).
+ * With a present UUID (online or offline), providers decide via
  * {@link Provider#isBlocked(Identifier, UUID, Level, ServerPlayer)}; {@code onlinePlayer} may be
  * null when the owner is offline.
  */
 public final class RecipeBlockBridge {
     public interface Provider {
         /**
-         * Primary gate for a known owner UUID (online or offline).
-         * Called only when {@code ownerUuid} is non-null.
+         * Primary gate for an owner UUID (online or offline) or no-owner machines.
          *
          * @param recipeId     definitive RecipeManager id ({@code namespace:path_N} after bundle split)
-         * @param ownerUuid    machine owner UUID (non-null when invoked from the bridge)
+         * @param ownerUuid    machine owner UUID; may be null when the machine has no owner
          * @param level        world context; may be null
-         * @param onlinePlayer owner when currently online; may be null if offline
+         * @param onlinePlayer owner when currently online; may be null if offline or no owner
          * @return true if this provider blocks the recipe for the given context
          */
         boolean isBlocked(
@@ -71,8 +71,8 @@ public final class RecipeBlockBridge {
 
     /**
      * True if this recipe id is blocked for the given owner.
-     * No providers → not blocked. Providers present and {@code ownerUuid == null} → blocked
-     * without calling providers. Otherwise providers decide for that UUID (offline allowed).
+     * No providers → not blocked. Otherwise providers decide (including {@code ownerUuid == null}
+     * for no-owner machines; offline UUID allowed when present).
      */
     public static boolean isRecipeBlocked(
             Identifier recipeId, @Nullable UUID ownerUuid, @Nullable Level level) {
@@ -81,9 +81,6 @@ public final class RecipeBlockBridge {
         }
         if (PROVIDERS.isEmpty()) {
             return false;
-        }
-        if (ownerUuid == null) {
-            return true;
         }
         ServerPlayer onlinePlayer = resolveOnlinePlayer(level, ownerUuid);
         for (Provider provider : PROVIDERS) {
