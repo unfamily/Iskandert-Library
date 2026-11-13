@@ -67,6 +67,15 @@ configurations {
 dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.7:processor'
 
+    // Another Config Manager — hard dep; localRuntime for runServer/client smoke
+    def acmLocalJar = file('../AnotherConfigManager/build/libs/another_config_manager-1.0.0.0.0-neoforge-1.21.1.jar')
+    if (!acmLocalJar.exists()) {
+        acmLocalJar = file('../iskandert_utilities/libs/another_config_manager-1.0.0.0.0.jar')
+    }
+    if (acmLocalJar.exists()) {
+        localRuntime files(acmLocalJar)
+    }
+
     compileOnly 'curse.maven:architectury-api-419699:5786327'
     localRuntime 'curse.maven:architectury-api-419699:5786327'
     compileOnly 'curse.maven:ftb-teams-forge-404468:8724782'
