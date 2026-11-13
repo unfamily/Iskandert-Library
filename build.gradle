@@ -114,6 +114,12 @@ dependencies {
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
 
+    // Another Config Manager — hard dep; localRuntime for runServer/client smoke
+    def acmLocalJar = file('../AnotherConfigManager-26.1.2/build/libs/another_config_manager-1.0.0.0.0-neoforge-26.1.2.jar')
+    if (acmLocalJar.exists()) {
+        localRuntime files(acmLocalJar)
+    }
+
     compileOnly "dev.ftb.mods:ftb-library-neoforge:26.1.2.7"
     localRuntime "dev.ftb.mods:ftb-library-neoforge:26.1.2.7"
     compileOnly "dev.ftb.mods:ftb-teams-neoforge:26.1.2.4"
