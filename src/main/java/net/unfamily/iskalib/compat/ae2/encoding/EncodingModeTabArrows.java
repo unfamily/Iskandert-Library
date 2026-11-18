@@ -15,8 +15,8 @@ import appeng.client.gui.widgets.TabButton;
 
 /**
  * Adaptive UP/DOWN arrow tabs for AE2 Pattern Encoding mode tabs when more than 4 modes
- * are registered. Arrows are the same {@link TabButton} chrome as AE2 mode tabs (HORIZONTAL),
- * with arrow icons. There is no scroll bar/wheel UI.
+ * are registered. Same scroll behavior as before; arrows use AE2 HORIZONTAL {@link TabButton}
+ * chrome with arrow icons (not {@code IconButton}).
  *
  * <p>Optional AE2 integration — call only when AE2 is loaded.
  */
@@ -24,9 +24,6 @@ public final class EncodingModeTabArrows {
 
     private static final int SLOT_COUNT = 4;
     private static final WeakHashMap<PatternEncodingTermScreen<?>, State> STATES = new WeakHashMap<>();
-
-    /** Client-session scroll offset restored when reopening the encoding terminal. */
-    private static int rememberedOffset;
 
     private EncodingModeTabArrows() {
     }
@@ -92,13 +89,11 @@ public final class EncodingModeTabArrows {
         private State(PatternEncodingTermScreen<?> screen, List<TabButton> ae2Tabs) {
             this.screen = screen;
             this.ae2Tabs = ae2Tabs;
-            this.offset = Math.max(0, rememberedOffset);
             this.upArrow = new TabButton(Icon.ARROW_UP,
                     Component.translatable("gui.iska_lib.encoding_arrow.up"),
                     btn -> {
                         if (offset > 0) {
                             offset--;
-                            rememberedOffset = offset;
                             layout();
                         }
                     });
@@ -108,7 +103,6 @@ public final class EncodingModeTabArrows {
                     btn -> {
                         if (offset < maxOffset()) {
                             offset++;
-                            rememberedOffset = offset;
                             layout();
                         }
                     });
@@ -134,7 +128,6 @@ public final class EncodingModeTabArrows {
             }
             int guiLeft = screen.getGuiLeft();
             int guiTop = screen.getGuiTop();
-            // AE2 styles tabs after init; until then getX/getY stay at origin.
             if (guiLeft == 0 && guiTop == 0) {
                 boolean allAtOrigin = true;
                 for (TabButton tab : ae2Tabs) {
@@ -196,70 +189,11 @@ public final class EncodingModeTabArrows {
             if (total <= SLOT_COUNT) {
                 return 0;
             }
-            // With both arrows visible, two middle slots show modes.
             return Math.max(0, total - 2);
-        }
-
-        /**
-         * If a mode tab is selected, ensure {@code offset} keeps it in the visible window
-         * (between optional UP/DOWN arrow slots).
-         */
-        private void ensureSelectedVisible(List<TabButton> all) {
-            int total = all.size();
-            if (total <= SLOT_COUNT) {
-                return;
-            }
-            int selected = -1;
-            for (int i = 0; i < total; i++) {
-                if (all.get(i).isSelected()) {
-                    selected = i;
-                    break;
-                }
-            }
-            if (selected < 0) {
-                return;
-            }
-
-            // Prefer keeping selection in the middle band; recompute after offset tweaks.
-            for (int guard = 0; guard < total; guard++) {
-                offset = Math.max(0, Math.min(offset, maxOffset()));
-                boolean showUp = offset > 0;
-                int avail = SLOT_COUNT - (showUp ? 1 : 0);
-                int remaining = total - offset;
-                boolean showDown = remaining > avail;
-                int modeSlots = showDown ? avail - 1 : Math.min(avail, remaining);
-                if (modeSlots < 0) {
-                    modeSlots = 0;
-                }
-                int first = offset;
-                int last = offset + Math.max(modeSlots - 1, 0);
-                if (selected < first) {
-                    offset = selected;
-                    continue;
-                }
-                if (selected > last) {
-                    // Place selection in the last mode slot of a window that may include DOWN.
-                    int newOffset = selected - (modeSlots - 1);
-                    if (showUp || newOffset > 0) {
-                        // Window will likely show UP when offset > 0 → one fewer mode slot.
-                        boolean willShowUp = newOffset > 0;
-                        int willAvail = SLOT_COUNT - (willShowUp ? 1 : 0);
-                        int willRemain = total - newOffset;
-                        boolean willShowDown = willRemain > willAvail;
-                        int willModes = willShowDown ? willAvail - 1 : Math.min(willAvail, willRemain);
-                        newOffset = selected - Math.max(willModes - 1, 0);
-                    }
-                    offset = Math.max(0, Math.min(newOffset, maxOffset()));
-                    continue;
-                }
-                break;
-            }
-            rememberedOffset = offset;
         }
 
         private void layout() {
             captureSlotsIfNeeded();
-            // Before a valid capture, leave AE2 vanilla tab positions alone.
             if (!slotsCaptured) {
                 return;
             }
@@ -277,14 +211,12 @@ public final class EncodingModeTabArrows {
 
             if (total <= SLOT_COUNT) {
                 offset = 0;
-                rememberedOffset = 0;
                 for (int i = 0; i < total; i++) {
                     place(all.get(i), i);
                 }
                 return;
             }
 
-            ensureSelectedVisible(all);
             offset = Math.max(0, Math.min(offset, maxOffset()));
 
             boolean showUp = offset > 0;
@@ -304,7 +236,6 @@ public final class EncodingModeTabArrows {
             if (modeSlots < 0) {
                 modeSlots = 0;
             }
-            rememberedOffset = offset;
 
             int slot = 0;
             if (showUp) {
