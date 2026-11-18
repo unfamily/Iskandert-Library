@@ -64,5 +64,7 @@
   "ftbquests.reward.iska_lib.iska_currency.amount": "Quantità",
   "ftbquests.reward.iska_lib.iska_currency.notify": "Saldo del team aggiornato di %s %s.",
   "ftbquests.reward.iska_lib.iska_currency.failed": "Impossibile aggiornare il saldo del team di %s %s.",
-  "commands.iska_lib.stage.edit.unavailable": "Stage Generator non disponibile (installa Another Stages)."
+  "commands.iska_lib.stage.edit.unavailable": "Stage Generator non disponibile (installa Another Stages).",
+  "gui.iska_lib.encoding_arrow.up": "Modalità encoding precedenti",
+  "gui.iska_lib.encoding_arrow.down": "Altre modalità encoding"
 }

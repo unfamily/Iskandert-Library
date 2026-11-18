@@ -64,5 +64,7 @@
   "ftbquests.reward.iska_lib.iska_currency.amount": "Amount",
   "ftbquests.reward.iska_lib.iska_currency.notify": "Updated team balance by %s %s.",
   "ftbquests.reward.iska_lib.iska_currency.failed": "Could not update team balance by %s %s.",
-  "commands.iska_lib.stage.edit.unavailable": "Stage Generator is unavailable (install Another Stages)."
+  "commands.iska_lib.stage.edit.unavailable": "Stage Generator is unavailable (install Another Stages).",
+  "gui.iska_lib.encoding_arrow.up": "Previous encoding modes",
+  "gui.iska_lib.encoding_arrow.down": "More encoding modes"
 }

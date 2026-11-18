@@ -129,6 +129,9 @@ dependencies {
     compileOnly "dev.ftb.mods:ftb-ultimine-neoforge:26.1.2.5"
     localRuntime "dev.ftb.mods:ftb-ultimine-neoforge:26.1.2.5"
 
+    // Optional AE2 — Pattern Encoding tab arrows (soft dep)
+    compileOnly "curse.maven:applied-energistics-2-223794:${ae2_file_id}"
+
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
