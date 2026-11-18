@@ -233,13 +233,10 @@ public class StructureLoader {
                 return nickname;
             }
             
-            // Check if we're on server side
-            boolean isServer = isRunningOnServer();
-            
-            if (!isServer) {
-                // We're on client side - try to get the client player
+            // Prefer FML dist — getCurrentServer() is null during early dedicated boot and
+            // Class.forName(Minecraft) trips DistCleaner.
+            if (net.unfamily.iskalib.IskaLib.isPhysicalClient()) {
                 try {
-                    // Use reflection to avoid errors when client class is not available on server side
                     Class<?> minecraftClass = Class.forName("net.minecraft.client.Minecraft");
                     Object minecraft = minecraftClass.getMethod("getInstance").invoke(null);
                     if (minecraft != null) {
@@ -991,11 +988,18 @@ public class StructureLoader {
      * @param serverAcceptsClientStructures Flag indicating if the server accepts client structures
      */
     public static void syncFromServer(Map<String, String> serverStructureData, boolean serverAcceptsClientStructures) {
-        // Check if we're in singleplayer mode - if so, don't synchronize
+        // Client-only path — never touch Minecraft on dedicated (DistCleaner).
+        if (!net.unfamily.iskalib.IskaLib.isPhysicalClient()) {
+            return;
+        }
         try {
-            net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
-            if (minecraft != null && minecraft.hasSingleplayerServer()) {
-                return;
+            Class<?> minecraftClass = Class.forName("net.minecraft.client.Minecraft");
+            Object minecraft = minecraftClass.getMethod("getInstance").invoke(null);
+            if (minecraft != null) {
+                Boolean integrated = (Boolean) minecraftClass.getMethod("hasSingleplayerServer").invoke(minecraft);
+                if (Boolean.TRUE.equals(integrated)) {
+                    return;
+                }
             }
         } catch (Exception e) {
             // If we can't determine it, proceed with synchronization

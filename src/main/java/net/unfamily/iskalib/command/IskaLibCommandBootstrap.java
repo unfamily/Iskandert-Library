@@ -15,7 +15,10 @@ public final class IskaLibCommandBootstrap {
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         var dispatcher = event.getDispatcher();
-        MarkerCommand.register(dispatcher);
+        // Client-only world markers — skip on dedicated so MarkRenderer never loads.
+        if (IskaLib.isPhysicalClient()) {
+            MarkerCommand.register(dispatcher);
+        }
         StageCommand.register(dispatcher);
         IskaLibDebugCommand.register(dispatcher);
         ExplosionCommand.register(dispatcher);

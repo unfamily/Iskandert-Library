@@ -1,5 +1,6 @@
 package net.unfamily.iskalib;
 
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -7,13 +8,13 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
-import net.unfamily.iskalib.client.marker.VanillaWorldMarkerClientHooks;
 import net.unfamily.iskalib.explosion.ExplosionSystem;
 import net.unfamily.iskalib.gas.GasJsonLoader;
 import net.unfamily.iskalib.gas.IskaLibGases;
@@ -34,7 +35,15 @@ public class IskaLib {
         net.unfamily.iskalib.flux.IskaLibParticles.register(modEventBus);
         IskaLibGases.initLibrary(modEventBus);
         IskaLibLiquids.initLibrary(modEventBus);
-        net.unfamily.iskalib.client.IskaLibConsumerClientHooks.hookConsumerModClientOnce(modEventBus);
+        if (isPhysicalClient()) {
+            try {
+                Class.forName("net.unfamily.iskalib.client.IskaLibConsumerClientHooks")
+                        .getMethod("hookConsumerModClientOnce", IEventBus.class)
+                        .invoke(null, modEventBus);
+            } catch (Throwable t) {
+                LOGGER.error("Failed to hook consumer client events", t);
+            }
+        }
         LiquidJsonLoader.bootstrapAndRegister(true);
         GasJsonLoader.bootstrapAndRegister(true);
         ToolBehaviorLoader.loadAllBootstrap();
@@ -64,7 +73,13 @@ public class IskaLib {
             }
         }
         if (isPhysicalClient()) {
-            VanillaWorldMarkerClientHooks.registerIfNeeded(NeoForge.EVENT_BUS);
+            try {
+                Class.forName("net.unfamily.iskalib.client.marker.VanillaWorldMarkerClientHooks")
+                        .getMethod("registerIfNeeded", IEventBus.class)
+                        .invoke(null, NeoForge.EVENT_BUS);
+            } catch (Throwable t) {
+                LOGGER.error("Failed to register vanilla world marker client hooks", t);
+            }
         }
     }
 
@@ -86,12 +101,8 @@ public class IskaLib {
         }
     }
 
-    private static boolean isPhysicalClient() {
-        try {
-            Class.forName("net.minecraft.client.Minecraft");
-            return true;
-        } catch (Throwable ignored) {
-            return false;
-        }
+    /** Prefer FML dist — Class.forName(Minecraft) is unreliable under DistCleaner on dedicated. */
+    public static boolean isPhysicalClient() {
+        return FMLEnvironment.getDist() == Dist.CLIENT;
     }
 }

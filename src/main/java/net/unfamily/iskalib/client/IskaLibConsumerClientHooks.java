@@ -34,16 +34,6 @@ public final class IskaLibConsumerClientHooks {
     }
 
     private static boolean isPhysicalClient() {
-        try {
-            return net.neoforged.fml.loading.FMLEnvironment.getDist()
-                    == net.neoforged.api.distmarker.Dist.CLIENT;
-        } catch (Throwable ignored) {
-            try {
-                Class.forName("net.minecraft.client.Minecraft");
-                return true;
-            } catch (Throwable ignored2) {
-                return false;
-            }
-        }
+        return net.unfamily.iskalib.IskaLib.isPhysicalClient();
     }
 }
