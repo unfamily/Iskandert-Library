@@ -37,12 +37,7 @@ public final class IskaLibFluidClient {
     }
 
     private static boolean isPhysicalClient() {
-        try {
-            Class.forName("net.minecraft.client.Minecraft");
-            return true;
-        } catch (Throwable ignored) {
-            return false;
-        }
+        return net.unfamily.iskalib.IskaLib.isPhysicalClient();
     }
 
     public static void registerClientExtensions(RegisterClientExtensionsEvent event) {

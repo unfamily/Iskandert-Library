@@ -1,25 +1,25 @@
 package net.unfamily.iskalib;
 
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
-import net.unfamily.iskalib.client.marker.VanillaWorldMarkerClientHooks;
 import net.unfamily.iskalib.explosion.ExplosionSystem;
 import net.unfamily.iskalib.gas.IskaLibGases;
 import net.unfamily.iskalib.liquid.IskaLibLiquids;
 import net.unfamily.iskalib.gas.GasJsonLoader;
 import net.unfamily.iskalib.liquid.LiquidJsonLoader;
-import net.unfamily.iskalib.IskaLibCreativeTabs;
 import net.unfamily.iskalib.shop.ShopCurrencyCatalog;
 import net.unfamily.iskalib.stage.StageBootstrap;
 import net.unfamily.iskalib.tool.ToolBehaviorLoader;
@@ -64,7 +64,13 @@ public class IskaLib {
         ShopCurrencyCatalog.bootstrapFromJar();
         ShopCurrencyCatalog.installAsDefaultListener();
         if (isPhysicalClient()) {
-            VanillaWorldMarkerClientHooks.registerIfNeeded(NeoForge.EVENT_BUS);
+            try {
+                Class.forName("net.unfamily.iskalib.client.marker.VanillaWorldMarkerClientHooks")
+                        .getMethod("registerIfNeeded", IEventBus.class)
+                        .invoke(null, NeoForge.EVENT_BUS);
+            } catch (Throwable t) {
+                LOGGER.error("Failed to register vanilla world marker client hooks", t);
+            }
         }
     }
 
@@ -86,12 +92,8 @@ public class IskaLib {
         }
     }
 
-    private static boolean isPhysicalClient() {
-        try {
-            Class.forName("net.minecraft.client.Minecraft");
-            return true;
-        } catch (Throwable ignored) {
-            return false;
-        }
+    /** Prefer FML dist — Class.forName(Minecraft) is unreliable under DistCleaner on dedicated. */
+    public static boolean isPhysicalClient() {
+        return FMLEnvironment.dist == Dist.CLIENT;
     }
 }

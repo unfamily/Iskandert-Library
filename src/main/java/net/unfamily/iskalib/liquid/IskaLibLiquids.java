@@ -73,7 +73,16 @@ public final class IskaLibLiquids {
     }
 
     private static void hookClientEventsOnce(IEventBus modEventBus) {
-        net.unfamily.iskalib.client.IskaLibFluidClient.hookConsumerModClientOnce(modEventBus);
+        if (!net.unfamily.iskalib.IskaLib.isPhysicalClient() || modEventBus == null) {
+            return;
+        }
+        try {
+            Class.forName("net.unfamily.iskalib.client.IskaLibFluidClient")
+                    .getMethod("hookConsumerModClientOnce", IEventBus.class)
+                    .invoke(null, modEventBus);
+        } catch (Throwable ignored) {
+            // Client-only; DistCleaner must never see a hard client class ref from common init.
+        }
     }
 
     /**
