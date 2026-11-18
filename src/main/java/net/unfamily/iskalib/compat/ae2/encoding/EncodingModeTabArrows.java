@@ -6,6 +6,8 @@ import java.util.WeakHashMap;
 
 import org.jetbrains.annotations.Nullable;
 
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import net.neoforged.fml.ModList;
 
@@ -16,7 +18,7 @@ import appeng.client.gui.widgets.TabButton;
 /**
  * Adaptive UP/DOWN arrow tabs for AE2 Pattern Encoding mode tabs when more than 4 modes
  * are registered. Same scroll behavior as before; arrows use AE2 HORIZONTAL {@link TabButton}
- * chrome with arrow icons (not {@code IconButton}).
+ * chrome with arrow icons (not {@code IconButton}). Highlight only while hovered.
  *
  * <p>Optional AE2 integration — call only when AE2 is loaded.
  */
@@ -89,7 +91,7 @@ public final class EncodingModeTabArrows {
         private State(PatternEncodingTermScreen<?> screen, List<TabButton> ae2Tabs) {
             this.screen = screen;
             this.ae2Tabs = ae2Tabs;
-            this.upArrow = new TabButton(Icon.ARROW_UP,
+            this.upArrow = new HoverOnlyTabButton(Icon.ARROW_UP,
                     Component.translatable("gui.iska_lib.encoding_arrow.up"),
                     btn -> {
                         if (offset > 0) {
@@ -97,8 +99,7 @@ public final class EncodingModeTabArrows {
                             layout();
                         }
                     });
-            this.upArrow.setStyle(TabButton.Style.HORIZONTAL);
-            this.downArrow = new TabButton(Icon.ARROW_DOWN,
+            this.downArrow = new HoverOnlyTabButton(Icon.ARROW_DOWN,
                     Component.translatable("gui.iska_lib.encoding_arrow.down"),
                     btn -> {
                         if (offset < maxOffset()) {
@@ -106,7 +107,6 @@ public final class EncodingModeTabArrows {
                             layout();
                         }
                     });
-            this.downArrow.setStyle(TabButton.Style.HORIZONTAL);
             this.upArrow.visible = false;
             this.downArrow.visible = false;
         }
@@ -268,8 +268,29 @@ public final class EncodingModeTabArrows {
             }
             arrow.setX(screen.getGuiLeft() + slotRelX[slotIndex]);
             arrow.setY(screen.getGuiTop() + slotRelY[slotIndex]);
+            arrow.setSelected(false);
+            arrow.setFocused(false);
             arrow.visible = true;
             arrow.active = true;
+        }
+    }
+
+    /**
+     * Same HORIZONTAL tab look as AE2 mode tabs, but lights only while the cursor is over
+     * the button (vanilla TabButton stays lit after click via focus).
+     */
+    private static final class HoverOnlyTabButton extends TabButton {
+        private HoverOnlyTabButton(Icon icon, Component message, Button.OnPress onPress) {
+            super(icon, message, onPress);
+            setStyle(Style.HORIZONTAL);
+        }
+
+        @Override
+        public void extractContents(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+            setSelected(false);
+            setFocused(isHovered());
+            super.extractContents(guiGraphics, mouseX, mouseY, partialTick);
+            setFocused(false);
         }
     }
 }
