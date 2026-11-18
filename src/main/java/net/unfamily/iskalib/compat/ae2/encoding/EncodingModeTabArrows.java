@@ -6,18 +6,17 @@ import java.util.WeakHashMap;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import net.neoforged.fml.ModList;
 
 import appeng.util.Icon;
 import appeng.client.gui.me.items.PatternEncodingTermScreen;
-import appeng.client.gui.widgets.IconButton;
 import appeng.client.gui.widgets.TabButton;
 
 /**
- * Adaptive UP/DOWN arrow buttons for AE2 Pattern Encoding mode tabs when more than 4 modes
- * are registered. Arrows replace the first/last column slots; there is no scroll bar/wheel UI.
+ * Adaptive UP/DOWN arrow tabs for AE2 Pattern Encoding mode tabs when more than 4 modes
+ * are registered. Arrows are the same {@link TabButton} chrome as AE2 mode tabs (HORIZONTAL),
+ * with arrow icons. There is no scroll bar/wheel UI.
  *
  * <p>Optional AE2 integration — call only when AE2 is loaded.
  */
@@ -25,6 +24,9 @@ public final class EncodingModeTabArrows {
 
     private static final int SLOT_COUNT = 4;
     private static final WeakHashMap<PatternEncodingTermScreen<?>, State> STATES = new WeakHashMap<>();
+
+    /** Client-session scroll offset restored when reopening the encoding terminal. */
+    private static int rememberedOffset;
 
     private EncodingModeTabArrows() {
     }
@@ -37,7 +39,7 @@ public final class EncodingModeTabArrows {
      * Attach arrow management to a Pattern Encoding Terminal screen.
      *
      * @param ae2Tabs mode tabs already created by AE2, in display order (typically enum order)
-     * @return UP/DOWN arrow buttons the caller must add as screen widgets ({@code addRenderableWidget})
+     * @return UP/DOWN arrow tabs the caller must add as screen widgets ({@code addRenderableWidget})
      */
     @Nullable
     public static ArrowPair attach(PatternEncodingTermScreen<?> screen, List<TabButton> ae2Tabs) {
@@ -52,7 +54,7 @@ public final class EncodingModeTabArrows {
     }
 
     /** UP/DOWN arrow widgets created by {@link #attach}. */
-    public record ArrowPair(IconButton up, IconButton down) {
+    public record ArrowPair(TabButton up, TabButton down) {
     }
 
     /** Register an extra encoding tab (e.g. Matter) after {@link #attach}. */
@@ -79,8 +81,8 @@ public final class EncodingModeTabArrows {
         private final PatternEncodingTermScreen<?> screen;
         private final List<TabButton> ae2Tabs;
         private final List<TabButton> extraTabs = new ArrayList<>();
-        private final ArrowBtn upArrow;
-        private final ArrowBtn downArrow;
+        private final TabButton upArrow;
+        private final TabButton downArrow;
         /** Slot positions relative to guiLeft / guiTop. */
         private final int[] slotRelX = new int[SLOT_COUNT];
         private final int[] slotRelY = new int[SLOT_COUNT];
@@ -90,18 +92,27 @@ public final class EncodingModeTabArrows {
         private State(PatternEncodingTermScreen<?> screen, List<TabButton> ae2Tabs) {
             this.screen = screen;
             this.ae2Tabs = ae2Tabs;
-            this.upArrow = new ArrowBtn(Icon.ARROW_UP, btn -> {
-                if (offset > 0) {
-                    offset--;
-                    layout();
-                }
-            });
-            this.downArrow = new ArrowBtn(Icon.ARROW_DOWN, btn -> {
-                if (offset < maxOffset()) {
-                    offset++;
-                    layout();
-                }
-            });
+            this.offset = Math.max(0, rememberedOffset);
+            this.upArrow = new TabButton(Icon.ARROW_UP,
+                    Component.translatable("gui.iska_lib.encoding_arrow.up"),
+                    btn -> {
+                        if (offset > 0) {
+                            offset--;
+                            rememberedOffset = offset;
+                            layout();
+                        }
+                    });
+            this.upArrow.setStyle(TabButton.Style.HORIZONTAL);
+            this.downArrow = new TabButton(Icon.ARROW_DOWN,
+                    Component.translatable("gui.iska_lib.encoding_arrow.down"),
+                    btn -> {
+                        if (offset < maxOffset()) {
+                            offset++;
+                            rememberedOffset = offset;
+                            layout();
+                        }
+                    });
+            this.downArrow.setStyle(TabButton.Style.HORIZONTAL);
             this.upArrow.visible = false;
             this.downArrow.visible = false;
         }
@@ -189,6 +200,63 @@ public final class EncodingModeTabArrows {
             return Math.max(0, total - 2);
         }
 
+        /**
+         * If a mode tab is selected, ensure {@code offset} keeps it in the visible window
+         * (between optional UP/DOWN arrow slots).
+         */
+        private void ensureSelectedVisible(List<TabButton> all) {
+            int total = all.size();
+            if (total <= SLOT_COUNT) {
+                return;
+            }
+            int selected = -1;
+            for (int i = 0; i < total; i++) {
+                if (all.get(i).isSelected()) {
+                    selected = i;
+                    break;
+                }
+            }
+            if (selected < 0) {
+                return;
+            }
+
+            // Prefer keeping selection in the middle band; recompute after offset tweaks.
+            for (int guard = 0; guard < total; guard++) {
+                offset = Math.max(0, Math.min(offset, maxOffset()));
+                boolean showUp = offset > 0;
+                int avail = SLOT_COUNT - (showUp ? 1 : 0);
+                int remaining = total - offset;
+                boolean showDown = remaining > avail;
+                int modeSlots = showDown ? avail - 1 : Math.min(avail, remaining);
+                if (modeSlots < 0) {
+                    modeSlots = 0;
+                }
+                int first = offset;
+                int last = offset + Math.max(modeSlots - 1, 0);
+                if (selected < first) {
+                    offset = selected;
+                    continue;
+                }
+                if (selected > last) {
+                    // Place selection in the last mode slot of a window that may include DOWN.
+                    int newOffset = selected - (modeSlots - 1);
+                    if (showUp || newOffset > 0) {
+                        // Window will likely show UP when offset > 0 → one fewer mode slot.
+                        boolean willShowUp = newOffset > 0;
+                        int willAvail = SLOT_COUNT - (willShowUp ? 1 : 0);
+                        int willRemain = total - newOffset;
+                        boolean willShowDown = willRemain > willAvail;
+                        int willModes = willShowDown ? willAvail - 1 : Math.min(willAvail, willRemain);
+                        newOffset = selected - Math.max(willModes - 1, 0);
+                    }
+                    offset = Math.max(0, Math.min(newOffset, maxOffset()));
+                    continue;
+                }
+                break;
+            }
+            rememberedOffset = offset;
+        }
+
         private void layout() {
             captureSlotsIfNeeded();
             // Before a valid capture, leave AE2 vanilla tab positions alone.
@@ -209,12 +277,14 @@ public final class EncodingModeTabArrows {
 
             if (total <= SLOT_COUNT) {
                 offset = 0;
+                rememberedOffset = 0;
                 for (int i = 0; i < total; i++) {
                     place(all.get(i), i);
                 }
                 return;
             }
 
+            ensureSelectedVisible(all);
             offset = Math.max(0, Math.min(offset, maxOffset()));
 
             boolean showUp = offset > 0;
@@ -234,6 +304,7 @@ public final class EncodingModeTabArrows {
             if (modeSlots < 0) {
                 modeSlots = 0;
             }
+            rememberedOffset = offset;
 
             int slot = 0;
             if (showUp) {
@@ -260,31 +331,14 @@ public final class EncodingModeTabArrows {
             tab.active = true;
         }
 
-        private void placeArrow(ArrowBtn arrow, int slotIndex) {
+        private void placeArrow(TabButton arrow, int slotIndex) {
             if (slotIndex < 0 || slotIndex >= SLOT_COUNT) {
                 return;
             }
-            arrow.setX(screen.getGuiLeft() + slotRelX[slotIndex] + 3);
-            arrow.setY(screen.getGuiTop() + slotRelY[slotIndex] + 3);
+            arrow.setX(screen.getGuiLeft() + slotRelX[slotIndex]);
+            arrow.setY(screen.getGuiTop() + slotRelY[slotIndex]);
             arrow.visible = true;
             arrow.active = true;
-        }
-    }
-
-    private static final class ArrowBtn extends IconButton {
-        private final Icon icon;
-
-        private ArrowBtn(Icon icon, Button.OnPress onPress) {
-            super(onPress);
-            this.icon = icon;
-            setMessage(icon == Icon.ARROW_UP
-                    ? Component.translatable("gui.iska_lib.encoding_arrow.up")
-                    : Component.translatable("gui.iska_lib.encoding_arrow.down"));
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return icon;
         }
     }
 }
